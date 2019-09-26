@@ -2,7 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vgo.tab.h"
+// extern int yydebug;
+
+#include "vgobison.tab.h"
+#include "globalutilities.h"
+
+// yydebug = 1;
 
 char *sanitizeFile(char *filename)
 {
@@ -43,9 +48,10 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    while (yylex() > 0)
+                    while (yyparse() > 0)
                     {
                     }
+
                     fclose(yyin);
                 }
             }

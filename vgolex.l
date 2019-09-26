@@ -2,9 +2,18 @@
 %option nounput
 %option yylineno
 %{
-    #include "linkedlist.h"
-    #include "vgo.tab.h"
-    
+    #include "vgobison.tab.h"
+    #include "tree.h"
+    #include "globalutilities.h"
+
+    int isender(int category);
+    int lasttoken;
+    int lineno;
+    int createSemicolon();
+    void createToken(int category);
+    void reportGenericError(char *errorMessage);
+    void reportError(char *errorMessage);
+    void reportErrorOnlyText(char *errorMessage, char *text);
 /*
  * This is part of the definitions section.  It starts with %{ and ends with %}.
  * Any text placed in this area will be copied verbatim into the lex.yy.c
@@ -26,11 +35,12 @@
      * must be indented because anything that appears in the leftmost column
      * is considered the start of a formal definition.
      */
-WHITESPACE          [ \t\n\r\s]
+WHITESPACE          [ \t\r]
+NEWLINE             "\n"
 
 COMMENT             "//".*
 
-IDENTIFIER          [a-zA-Z][_a-z0-9A-Z]{0,11}
+IDENTIFIER          [a-zA-Z_][_a-z0-9A-Z]{0,11}
 
 LPAREN              "("
 RPAREN              ")"
@@ -94,6 +104,8 @@ ANDCARET            "&^"
 IMAGINARY           ((0|([1-9][0-9]*))|([0-9]*"."[0-9]+)|(0[0-7]+)|(0x[0-9A-Fa-f]+)|([0-9]"."[0-9]*[eE]("-")?[0-9]+))[iI]
 TOOLONGSTRINGLIT       [a-z][A-Za-z0-9_]{12,}
 BACKTICK            "`"[^`]*"`"
+QUESTION            "?"
+DOLLAR              "$"
 
 
 %%
@@ -116,9 +128,11 @@ BACKTICK            "`"[^`]*"`"
      * Please see http://flex.sourceforge.net for further details.
      */
 
-{WHITESPACE}    {return 1;}/* Do nothing */
+{WHITESPACE}    {}/* Do nothing */
+{NEWLINE}       {lineno++; if(isender(lasttoken)){lasttoken = 0; return createSemicolon();};}
 
-{COMMENT}       {printf("What is the value of comment %s\n", yytext); createToken(COMMENT); return COMMENT;}
+{COMMENT}       {}
+
 
 break   |
 default |
@@ -137,27 +151,25 @@ continue    {
      return -1;
 }
 
-func    {createToken(FUNC); return FUNC;}
-map     {createToken(MAP); return MAP;}
-struct  {createToken(STRUCT); return STRUCT;}
-else    {createToken(ELSE); return ELSE;}
-package {createToken(PACKAGE); return PACKAGE; }
-const   {createToken(CONST); return CONST;}
-if      {createToken(IF); return IF;}
-type    {createToken(TYPE); return TYPE;}
-for     {createToken(FOR); return FOR;}
-import  {createToken(IMPORT); return IMPORT;}
-return  {createToken(RETURN); return RETURN;}
-var {
-    createToken(VAR); return VAR;
-}
+func    {createToken(LFUNC); return LFUNC;}
+map     {createToken(LMAP); return LMAP;}
+struct  {createToken(LSTRUCT); return LSTRUCT;}
+else    {createToken(LELSE); return LELSE;}
+package {createToken(LPACKAGE); return LPACKAGE; }
+const   {createToken(LCONST); return LCONST;}
+if      {createToken(LIF); return LIF;}
+type    {createToken(LTYPE); return LTYPE;}
+for     {createToken(LFOR); return LFOR;}
+import  {createToken(LIMPORT); return LIMPORT;}
+return  {createToken(LRETURN); return LRETURN;}
+var     {createToken(LVAR); return LVAR;}
 
 bool    {createToken(BOOL); return BOOL;}
 string  {createToken(STRING); return STRING;}
 int     {createToken(INT); return INT;}
-float64 {createToken(FLOAT); return FLOAT;}
+float64 {createToken(FLOAT64); return FLOAT64;}
 
-{IDENTIFIER}    {createToken(IDENTIFIER); return IDENTIFIER;} /* Add more */
+{IDENTIFIER}    {createToken(LNAME); return LNAME;} /* Add more */
 
 {LPAREN}        {createToken(LPAREN); return LPAREN; }
 {RPAREN}        {createToken(RPAREN); return RPAREN; }
@@ -172,22 +184,22 @@ float64 {createToken(FLOAT); return FLOAT;}
 {COLON}         {createToken(COLON); return COLON;}
 {EXCLAMATION}   {createToken(EXCLAMATION); return EXCLAMATION;}
 
-{EQUAL}         {createToken(EQUAL); return EQUAL;}
-{EQUALEQUAL}    {createToken(EQUALEQUAL); return EQUALEQUAL;}
-{NOTEQUAL}      {createToken(NOTEQUAL); return NOTEQUAL;}
-{LESSTHAN}      {createToken(LESSTHAN); return LESSTHAN;}
-{GREATERTHAN}   {createToken(GREATERTHAN); return GREATERTHAN;}
-{LESSTHANEQUAL} {createToken(LESSTHANEQUAL); return LESSTHANEQUAL;}
-{GREATERTHANEQUAL}  {createToken(GREATERTHANEQUAL); return GREATERTHANEQUAL;}
-{ANDAND}        {createToken(ANDAND); return ANDAND;}
-{OROR}          {createToken(OROR); return OROR;}
+{EQUAL}         {createToken(LASOP); return LASOP;}
+{EQUALEQUAL}    {createToken(LEQ); return LEQ;}
+{NOTEQUAL}      {createToken(LNE); return LNE;}
+{LESSTHAN}      {createToken(LLT); return LLT;}
+{GREATERTHAN}   {createToken(LGT); return LGT;}
+{LESSTHANEQUAL} {createToken(LLE); return LLE;}
+{GREATERTHANEQUAL}  {createToken(LGE); return LGE;}
+{ANDAND}        {createToken(LANDAND); return LANDAND;}
+{OROR}          {createToken(LOROR); return LOROR;}
 
 {PLUS}          {createToken(PLUS); return PLUS;}
-{PLUSPLUS}      {createToken(PLUSPLUS); return PLUSPLUS;}
-{PLUSEQUAL}     {createToken(PLUSEQUAL); return PLUSEQUAL;}
+{PLUSPLUS}      {createToken(LINC); return LINC;}
+{PLUSEQUAL}     {createToken(LASOP); return LASOP;}
 {MINUS}         {createToken(MINUS); return MINUS;}
-{MINUSMINUS}    {createToken(MINUSMINUS); return MINUSMINUS;}
-{MINUSEQUAL}    {createToken(MINUSEQUAL); return MINUSEQUAL;}
+{MINUSMINUS}    {createToken(LDEC); return LDEC;}
+{MINUSEQUAL}    {createToken(LASOP); return LASOP;}
 {STAR}          {createToken(STAR); return STAR;}
 {DIVIDE}        {createToken(DIVIDE); return DIVIDE;}
 {MOD}           {createToken(MOD); return MOD;}
@@ -200,6 +212,8 @@ float64 {createToken(FLOAT); return FLOAT;}
 {OCTAL}         {createToken(OCTAL); return OCTAL;}
 {HEXADECIMAL}   {createToken(HEXADECIMAL); return HEXADECIMAL;}
 {SCIENTIFICNUM} {createToken(SCIENTIFICNUM); return SCIENTIFICNUM;}
+
+<<EOF>>           {if(isender(lasttoken)){lasttoken = 0; return createSemicolon();}else{return -1;}}
 
 {BCOMMENT}      {reportGenericError("Error: found C style comments not supported in VGo\n"); return -1;}
 {COLONEQUAL}    {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
@@ -221,7 +235,8 @@ float64 {createToken(FLOAT); return FLOAT;}
 {IMAGINARY}     {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
 {TOOLONGSTRINGLIT} {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
 {BACKTICK}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-
+{QUESTION}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
+{DOLLAR}        {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
 
 .               {reportErrorOnlyText("Error: found `%s` which is not supported in VGo.\n", yytext); return -1;}
 %%
@@ -245,22 +260,25 @@ void createToken(int category){
     data->text = strcpy(data->text, yytext);
 
     data->linenumber = yylineno;
-    data->filename = currentfile;
+    data->filename = malloc(strlen(currentfile) + 1);
+    strcpy(data->filename, currentfile);
 
     if(category == NUMERICLITERAL || category == OCTAL || category == HEXADECIMAL){
         int ival = atoi (yytext);
         data->ival = ival;
     }else if(category == SCIENTIFICNUM || category == DECIMAL){
-        double dval = atof(yytext);
+        double dval = atof(yytext); 
         data->dval = dval;
     }else if(category == STRINGLIT || category == CHAR){
     int i = 0;
     data->sval = (char *)malloc(strlen(data->text) + 50);
+    data->sval[0] = '\0';
     for(i = 0; i < strlen(data->text); i++){
         if(data->text[i] == '\"'){
             // do nothing
         }
         else if(data->text[i] == '\\'){
+            // turn escaped character sequence into actual character
             switch(data->text[i+1]){
                 case '\"':
                     data->sval = strcat( data->sval, "\"" );
@@ -302,7 +320,8 @@ void createToken(int category){
             // skip ahead an extra character
             i++;
         }else{
-	        char *chartostring = malloc(data->text[i] + 1);
+            // base case copy char
+	        char *chartostring = malloc(2); // char + \0
 	        chartostring[0] = data->text[i];
 	        chartostring[1] = '\0';
             strcat(data->sval, chartostring);
@@ -313,30 +332,80 @@ void createToken(int category){
     
     }
 
-    // printData(data);
-    addToEnd(data);
-
+    struct Node *newNode = malloc(sizeof(struct Node));
+    newNode->numberOfChildren = 0;
+    newNode->children[0] = NULL;
+    newNode->data = data;
+    newNode->category = data->category;
+    newNode->categoryName = "terminal";
+    yylval.node = newNode;
+    lasttoken = data->category;
 }
 
 void reportError(char *errorMessage){
     printf("\033[0;31m");
     printf(errorMessage, currentfile, yylineno, yytext);
     printf("\033[0m");
-    deleteLinkedList();
+    exit(1);
 }
 
 void reportGenericError(char *errorMessage){
     printf("\033[0;31m");
     printf(errorMessage);
     printf("\033[0m");
-    deleteLinkedList();
+    exit(1);
 }
 
 void reportErrorOnlyText(char *errorMessage, char *text){
     printf("\033[0;31m");
     printf(errorMessage, text);
     printf("\033[0m");
-    deleteLinkedList();
+    exit(1);
+}
+
+ int isender(int category)
+{
+	switch(category) {
+	case LNAME: 
+    case RPAREN: 
+    case RBRACKET: 
+    case RSQUAREBRACE: 
+    case STRING: 
+    case STRINGLIT: 
+    case BOOL: 
+    case INT: 
+    case FLOAT64: 
+    case NUMERICLITERAL: 
+    case OCTAL: 
+    case HEXADECIMAL: 
+    case SCIENTIFICNUM: 
+    case DECIMAL: 
+    case CHAR:
+	     return 1;
+	}
+	return 0;
+}
+
+int createSemicolon(){
+    struct Token *data = malloc(sizeof(struct Token));
+    data->category = SEMICOLON;
+    data->text = ";";
+    data->linenumber = yylineno;
+    data->filename = malloc(strlen(currentfile) + 1);
+    strcpy(data->filename, currentfile);
+    
+    struct Node *newNode = malloc(sizeof(struct Node));
+    newNode->data = data;
+    newNode->category = SEMICOLON;
+    newNode->categoryName = "terminal";
+    newNode->numberOfChildren = 0;
+    
+    
+    yylval.node = newNode;
+    return SEMICOLON;
+}
+int yywrap(){
+    return -1;
 }
 
 /*
@@ -344,9 +413,3 @@ void reportErrorOnlyText(char *errorMessage, char *text){
  * be done when the end of an input file is encountered.  You can read more
  * about this at http://flex.sourceforge.net
  */
-int yywrap()
-{
-    printList();
-    deleteLinkedList();
-    return -1;
-}
