@@ -85,6 +85,7 @@ HEXADECIMAL         0x[0-9A-Fa-f]+
 SCIENTIFICNUM       [0-9]"."[0-9]*[eE]("-")?[0-9]+
 
 BCOMMENT            "/*"[^/]*"*/"
+BSTRINGLIT          \"[^\"]*
 COLONEQUAL          ":="
 AND                 "&"
 ANDEQUAL            "&="
@@ -184,7 +185,7 @@ float64 {createToken(FLOAT64); return FLOAT64;}
 {COLON}         {createToken(COLON); return COLON;}
 {EXCLAMATION}   {createToken(EXCLAMATION); return EXCLAMATION;}
 
-{EQUAL}         {createToken(LASOP); return LASOP;}
+{EQUAL}         {createToken(EQUAL); return EQUAL;}
 {EQUALEQUAL}    {createToken(LEQ); return LEQ;}
 {NOTEQUAL}      {createToken(LNE); return LNE;}
 {LESSTHAN}      {createToken(LLT); return LLT;}
@@ -216,29 +217,30 @@ float64 {createToken(FLOAT64); return FLOAT64;}
 <<EOF>>           {if(isender(lasttoken)){lasttoken = 0; return createSemicolon();}else{return -1;}}
 
 {BCOMMENT}      {reportGenericError("Error: found C style comments not supported in VGo\n"); return -1;}
-{COLONEQUAL}    {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{AND}           {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{ANDEQUAL}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{OR}            {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{OREQUAL}       {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{CARET}         {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{STAREQUAL}     {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{CARETEQUAL}    {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{LESSMINUS}     {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{LESSLESS}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{DIVIDEEQUAL}   {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{LESSLESSEQUAL} {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{GREATERGREATER}    {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{MODEQUAL}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{GREATERGREATEREQUAL}   {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{ANDCARET}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{IMAGINARY}     {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{TOOLONGSTRINGLIT} {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{BACKTICK}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{QUESTION}      {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
-{DOLLAR}        {reportError("Error: %s.%s found `%s` not supported in VGo\n"); return -1;}
+{BSTRINGLIT}    {reportGenericError("Error: missing closing \"\n"); return -1;}
+{COLONEQUAL}    {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{AND}           {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{ANDEQUAL}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{OR}            {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{OREQUAL}       {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{CARET}         {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{STAREQUAL}     {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{CARETEQUAL}    {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{LESSMINUS}     {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{LESSLESS}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{DIVIDEEQUAL}   {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{LESSLESSEQUAL} {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{GREATERGREATER}    {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{MODEQUAL}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{GREATERGREATEREQUAL}   {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{ANDCARET}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{IMAGINARY}     {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{TOOLONGSTRINGLIT} {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{BACKTICK}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{QUESTION}      {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
+{DOLLAR}        {reportError("Error: %s.%d found `%s` not supported in VGo\n"); return -1;}
 
-.               {reportErrorOnlyText("Error: found `%s` which is not supported in VGo.\n", yytext); return -1;}
+.               {reportErrorOnlyText("Error: found `%s` using the . method in flex.\n", yytext); return -1;}
 %%
 /*
  * This section is the user subroutines section.  It starts after the %% above
@@ -263,6 +265,9 @@ void createToken(int category){
     data->filename = malloc(strlen(currentfile) + 1);
     strcpy(data->filename, currentfile);
 
+
+    // initialize ival for later use
+    data->ival = -1;
     if(category == NUMERICLITERAL || category == OCTAL || category == HEXADECIMAL){
         int ival = atoi (yytext);
         data->ival = ival;
@@ -343,23 +348,17 @@ void createToken(int category){
 }
 
 void reportError(char *errorMessage){
-    printf("\033[0;31m");
     printf(errorMessage, currentfile, yylineno, yytext);
-    printf("\033[0m");
     exit(1);
 }
 
 void reportGenericError(char *errorMessage){
-    printf("\033[0;31m");
     printf(errorMessage);
-    printf("\033[0m");
     exit(1);
 }
 
 void reportErrorOnlyText(char *errorMessage, char *text){
-    printf("\033[0;31m");
     printf(errorMessage, text);
-    printf("\033[0m");
     exit(1);
 }
 
@@ -413,3 +412,4 @@ int yywrap(){
  * be done when the end of an input file is encountered.  You can read more
  * about this at http://flex.sourceforge.net
  */
+ 

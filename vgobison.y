@@ -53,7 +53,7 @@ int yyparse();
 %token <node>		LEAF
 
 
-%type <node>		lbrace import_here
+%type <node>		 import_here
 %type <node>		sym packname
 %type <node>		oliteral
 %type <node>		package
@@ -62,8 +62,6 @@ int yyparse();
 %type <node>		import_stmt
 %type <node>		import_stmt_list
 %type <node>		import_package
-%type <node>		hidden_import_list
-%type <node>		hidden_import
 %type <node>		ocomma
 %type <node>		osemi
 %type <node>		lconst
@@ -71,45 +69,32 @@ int yyparse();
 
 %type <node>		stmt ntype
 %type <node>		arg_type
-%type <node>		case caseblock
 %type <node>		compound_stmt dotname embed expr complitexpr bare_complitexpr
 %type <node>		expr_or_type
-%type <node>		fndcl hidden_fndcl fnliteral fnlitdcl
+%type <node>		fndcl fnliteral fnlitdcl
 %type <node>		for_body for_header for_stmt if_header if_stmt non_dcl_stmt
 %type <node>		interfacedcl keyval labelname name
 %type <node>		name_or_type non_expr_type
 %type <node>		new_name dcl_name oexpr typedclname
 %type <node>		onew_name
 %type <node>		osimple_stmt pexpr pexpr_no_paren
-%type <node>		pseudocall range_stmt select_stmt
+%type <node>		pseudocall range_stmt
 %type <node>		simple_stmt
-%type <node>		switch_stmt uexpr
-%type <node>		xfndcl typedcl start_complit
+%type <node>		uexpr
+%type <node>		xfndcl typedcl
 
 %type <node>		xdcl fnbody fnres loop_body dcl_name_list
 %type <node>		new_name_list expr_list keyval_list braced_keyval_list expr_or_type_list xdcl_list
-%type <node>		oexpr_list caseblock_list elseif elseif_list else stmt_list oarg_type_list_ocomma arg_type_list
+%type <node>		oexpr_list elseif elseif_list else stmt_list oarg_type_list_ocomma arg_type_list
 %type <node>		interfacedcl_list vardcl vardcl_list structdcl structdcl_list
 %type <node>		common_dcl constdcl constdcl1 constdcl_list typedcl_list
 
 %type <node>		convtype comptype dotdotdot
 %type <node>		indcl interfacetype structtype ptrtype
 %type <node>		recvchantype non_recvchantype othertype fnret_type fntype
+ 
+%type <node>		hidden_importsym
 
-%type <node>		hidden_importsym hidden_pkg_importsym
-
-%type <node>		hidden_constant hidden_literal hidden_funarg
-%type <node>		hidden_interfacedcl hidden_structdcl
-
-%type <node>		hidden_funres
-%type <node>		ohidden_funres
-%type <node>		hidden_funarg_list ohidden_funarg_list
-%type <node>		hidden_interfacedcl_list ohidden_interfacedcl_list
-%type <node>		hidden_structdcl_list ohidden_structdcl_list
-
-%type <node>		hidden_type hidden_type_misc hidden_pkgtype
-%type <node>		hidden_type_func
-%type <node>		hidden_type_recv_chan hidden_type_non_recv_chan
 %type <node>  		file
 %type <node>		semicolon
 %type <node>		lliteral type
@@ -139,7 +124,7 @@ int yyparse();
 %left		PreferToRightParen
 
 %%
-file:	package imports xdcl_list { treeprint(createTree(file, "file", 3, $1, $2, $3), 0);}  ;
+file:	package imports xdcl_list { treeHead = createTree(file, "file", 3, $1, $2, $3);}  ;
 
 package:
 	%prec NotPackage 
@@ -254,45 +239,8 @@ simple_stmt:
 |	expr LDEC {$$ = createTree(simple_stmt, "simple_stmt", 2, $1, $2);}
 	;
 
-case:
-	LCASE expr_or_type_list COLON {$$ = createTree(nonterminal_case, "nonterminal_case", 3, $1, $2, $3);}
-|	LCASE expr_or_type_list EQUAL expr COLON {$$ = createTree(nonterminal_case, "nonterminal_case", 5, $1, $2, $3, $4, $5);}
-|	LCASE expr_or_type_list LCOLAS expr COLON {$$ = createTree(nonterminal_case, "nonterminal_case", 5, $1, $2, $3, $4, $5);}
-|	LDEFAULT COLON {$$ = createTree(nonterminal_case, "nonterminal_case", 2, $1, $2);}
-	;
-
 compound_stmt:
         LBRACKET stmt_list RBRACKET {$$ = createTree(compound_stmt, "compound_stmt", 3, $1, $2, $3);}
-	;
-
-caseblock:
-	case	{
-		// If the last token read by the lexer was consumed
-		// as part of the case, clear it (parser has cleared yychar).
-		// If the last token read by the lexer was the lookahead
-		// leave it alone (parser has it cached in yychar).
-		// This is so that the stmt_list action doesn't look at
-		// the case tokens if the stmt_list is empty.
-		// yylast = yychar;
-	}
-	stmt_list	{
-//		int last;
-
-		// This is the only place in the language where a statement
-		// list is not allowed to drop the final semicolon, because
-		// it's the only place where a statement list is not followed 
-		// by a closing brace.  Handle the error for pedantry.
-
-		// Find the final token of the statement list.
-		// yylast is lookahead; yyprev is last of stmt_list
-		// last = yyprev;
-
-		// if(last > 0 && last != semicolon && yychar != RBRACKET)
-		//	yyerror("missing statement after label");
-	}
-
-caseblock_list:
-	caseblock_list caseblock {$$ = createTree(caseblock_list, "caseblock_list", 2, $1, $2);}
 	;
 
 loop_body:
@@ -344,16 +292,6 @@ else: {$$ = NULL;}
 |	LELSE compound_stmt {$$ = createTree(nonterminal_else, "nonterminal_else", 2, $1, $2);}
 	;
 
-switch_stmt:
-       LSWITCH 
-	   if_header 
-	   LBRACKET caseblock_list RBRACKET {$$ = createTree(switch_stmt, "switch_stmt", 5, $1, $2, $3, $4, $5);}
-	;
-
-select_stmt:
-        LSELECT LBRACKET caseblock_list RBRACKET {$$ = createTree(select_stmt, "select_stmt", 4, $1, $2, $3, $4);}
-	;
-
 /*
  * expressions
  */
@@ -399,7 +337,6 @@ pseudocall:
 	pexpr LPAREN RPAREN {$$ = createTree(pseudocall, "pseudocall", 3, $1, $2, $3);}
 |	pexpr LPAREN expr_or_type_list ocomma RPAREN {$$ = createTree(pseudocall, "pseudocall", 5, $1, $2, $3, $4, $5);}
 |	pexpr LPAREN expr_or_type_list LDDD ocomma RPAREN {$$ = createTree(pseudocall, "pseudocall", 6, $1, $2, $3, $4, $5, $6);}
-|	pexpr_no_paren LBRACKET start_complit braced_keyval_list RBRACKET {$$ = createTree(pseudocall, "pseudocall", 5, $1, $2, $3, $4, $5);}
 	;
 
 pexpr_no_paren:
@@ -413,15 +350,8 @@ pexpr_no_paren:
 |	pexpr LSQUAREBRACE oexpr COLON oexpr COLON oexpr RSQUAREBRACE {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 8, $1, $2, $3, $4, $5, $6, $7, $8);}
 |	pseudocall {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 1, $1);}
 |	convtype LPAREN expr ocomma RPAREN {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 5, $1, $2, $3, $4, $5);}
-|	comptype lbrace start_complit braced_keyval_list RBRACKET {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 5, $1, $2, $3, $4, $5);}
+|	comptype LBRACKET braced_keyval_list RBRACKET {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 4, $1, $2, $3, $4);}
 |	fnliteral {$$ = createTree(pexpr_no_paren, "pexpr_no_paren", 1, $1);}
-
-start_complit:
-	{
-		// composite expression.
-		// make node early so we get the right line number.
-	}
-	;
 
 keyval:
 	expr COLON complitexpr {$$ = createTree(keyval, "keyval", 3, $1, $2, $3);}
@@ -429,12 +359,12 @@ keyval:
 
 bare_complitexpr:
 	expr {$$ = createTree(bare_complitexpr, "bare_complitexpr", 1, $1);}
-|	LBRACKET start_complit braced_keyval_list RBRACKET {$$ = createTree(bare_complitexpr, "bare_complitexpr", 4, $1, $2, $3, $4);}
+|	LBRACKET braced_keyval_list RBRACKET {$$ = createTree(bare_complitexpr, "bare_complitexpr", 3, $1, $2, $3);}
 	;
 
 complitexpr:
 	expr {$$ = $1;}
-|	LBRACKET start_complit braced_keyval_list RBRACKET {$$ = createTree(complitexpr, "complitexpr", 4, $1, $2, $3, $4);}
+|	LBRACKET braced_keyval_list RBRACKET {$$ = createTree(complitexpr, "complitexpr", 3, $1, $2, $3);}
 	;
 
 pexpr:
@@ -448,10 +378,6 @@ expr_or_type:
 
 name_or_type:
 	ntype {$$ = createTree(name_or_type, "name_or_type", 1, $1);}
-
-lbrace:
-	LBRACKET {$$ = $1;}
-	;
 
 /*
  * names and types
@@ -568,13 +494,13 @@ recvchantype:
 	;
 
 structtype:
-	LSTRUCT lbrace structdcl_list osemi RBRACKET {$$ = createTree(structtype, "structtype", 5, $1, $2, $3, $4, $5);}
-|	LSTRUCT lbrace RBRACKET {$$ = createTree(structtype, "structtype", 3, $1, $2, $3);}
+	LSTRUCT LBRACKET structdcl_list osemi RBRACKET {$$ = createTree(structtype, "structtype", 5, $1, $2, $3, $4, $5);}
+|	LSTRUCT LBRACKET RBRACKET {$$ = createTree(structtype, "structtype", 3, $1, $2, $3);}
 	;
 
 interfacetype:
-	LINTERFACE lbrace interfacedcl_list osemi RBRACKET {$$ = createTree(interfacetype, "interfacetype", 5, $1, $2, $3, $4, $5);}
-|	LINTERFACE lbrace RBRACKET {$$ = createTree(interfacetype, "interfacetype", 3, $1, $2, $3);}
+	LINTERFACE LBRACKET interfacedcl_list osemi RBRACKET {$$ = createTree(interfacetype, "interfacetype", 5, $1, $2, $3, $4, $5);}
+|	LINTERFACE LBRACKET RBRACKET {$$ = createTree(interfacetype, "interfacetype", 3, $1, $2, $3);}
 	;
 
 /*
@@ -586,13 +512,8 @@ xfndcl:
 	;
 
 fndcl:
-	sym LPAREN oarg_type_list_ocomma RPAREN fnres {$$ = createTree(fndcl, "fndcl", 5, $1, $2, $3, $4, $5);}
-|	LPAREN oarg_type_list_ocomma RPAREN sym LPAREN oarg_type_list_ocomma RPAREN fnres {$$ = createTree(fndcl, "fndcl", 8, $1, $2, $3, $4, $5, $6, $7, $8);}
-	;
-
-hidden_fndcl:
-	hidden_pkg_importsym LPAREN ohidden_funarg_list RPAREN ohidden_funres {$$ = createTree(hidden_fndcl, "hidden_fndcl", 5, $1, $2, $3, $4, $5);}
-|	LPAREN hidden_funarg_list RPAREN sym LPAREN ohidden_funarg_list RPAREN ohidden_funres {$$ = createTree(hidden_fndcl, "hidden_fndcl", 8, $1, $2, $3, $4, $5, $6, $7, $8);}
+	sym LPAREN oarg_type_list_ocomma RPAREN fnres {$$ = createTree(fndcl, "fndcl", 3, $1, $3, $5);}
+|	LPAREN oarg_type_list_ocomma RPAREN sym LPAREN oarg_type_list_ocomma RPAREN fnres {yyerror("Not supported in VGo");}
 	;
 
 fntype:
@@ -614,7 +535,7 @@ fnlitdcl:
 	;
 
 fnliteral:
-	fnlitdcl lbrace stmt_list RBRACKET	{$$ = createTree(fnliteral, "fnliteral", 4, $1, $2, $3, $4);}
+	fnlitdcl LBRACKET stmt_list RBRACKET	{$$ = createTree(fnliteral, "fnliteral", 4, $1, $2, $3, $4);}
 |	fnlitdcl error {
 	yyerror("Error found in the function literal");}
 	;
@@ -703,8 +624,6 @@ stmt: {$$ = NULL;}
 non_dcl_stmt:
 	simple_stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 1, $1);}
 |	for_stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 1, $1);}
-|	switch_stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 1, $1);}
-|	select_stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 1, $1);}
 |	if_stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 1, $1);}
 |	labelname COLON 
 	stmt {$$ = createTree(non_dcl_stmt, "non_dcl_stmt", 3, $1, $2, $3);}
@@ -729,7 +648,7 @@ new_name_list:
 
 dcl_name_list:
 	dcl_name {$$ = createTree(dcl_name_list, "dcl_name_list", 1, $1);}
-|	dcl_name_list COMA dcl_name {$$ = createTree(dcl_name_list, "dcl_name_list", 3, $1, $2, $3);}
+|	dcl_name_list COMA dcl_name {$$ = createTree(dcl_name_list, "dcl_name_list", 2, $1, $3);}
 	;
 
 expr_list:
@@ -776,134 +695,8 @@ osimple_stmt: {$$ = NULL;}
 |	simple_stmt {$$ = createTree(osimple_stmt, "osimple_stmt", 1, $1);}
 	;
 
-ohidden_funarg_list:
-	hidden_funarg_list {$$ = createTree(ohidden_funarg_list, "ohidden_funarg_list", 1, $1);}
-	;
-
-ohidden_structdcl_list:
-	hidden_structdcl_list {$$ = createTree(ohidden_structdcl_list, "ohidden_structdcl_list", 1, $1);}
-	;
-
-ohidden_interfacedcl_list:
-	hidden_interfacedcl_list {$$ = createTree(ohidden_interfacedcl_list, "ohidden_interfacedcl_list", 1, $1);}
-	;
-
 oliteral: {$$ = NULL;}
 |	lliteral {$$ = $1;}
-	;
-
-/*
- * import syntax from package header
- */
-hidden_import:
-	LIMPORT LNAME lliteral semicolon {$$ = createTree(hidden_import, "hidden_import", 4, $1, $2, $3, $4);}
-|	LVAR hidden_pkg_importsym hidden_type semicolon {$$ = createTree(hidden_import, "hidden_import", 4, $1, $2, $3, $4);}
-|	LCONST hidden_pkg_importsym EQUAL hidden_constant semicolon {$$ = createTree(hidden_import, "hidden_import", 5, $1, $2, $3, $4, $5);}
-|	LCONST hidden_pkg_importsym hidden_type EQUAL hidden_constant semicolon {$$ = createTree(hidden_import, "hidden_import", 6, $1, $2, $3, $4, $5, $6);}
-|	LTYPE hidden_pkgtype hidden_type semicolon {$$ = createTree(hidden_import, "hidden_import", 4, $1, $2, $3, $4);}
-|	LFUNC hidden_fndcl fnbody semicolon {$$ = createTree(hidden_import, "hidden_import", 4, $1, $2, $3, $4);}
-	;
-
-hidden_pkg_importsym:
-	hidden_importsym {$$ = createTree(hidden_pkg_importsym, "hidden_pkg_importsym", 1, $1);}
-	;
-
-hidden_pkgtype:
-	hidden_pkg_importsym {$$ = createTree(hidden_pkgtype, "hidden_pkgtype", 1, $1);}
-	;
-
-/*
- *  importing types
- */
-
-hidden_type:
-	hidden_type_misc {$$ = createTree(hidden_type, "hidden_type", 1, $1);}
-|	hidden_type_recv_chan {$$ = createTree(hidden_type, "hidden_type", 1, $1);}
-|	hidden_type_func {$$ = createTree(hidden_type, "hidden_type", 1, $1);}
-	;
-
-hidden_type_non_recv_chan:
-	hidden_type_misc {$$ = createTree(hidden_type_non_recv_chan, "hidden_type_non_recv_chan", 1, $1);}
-|	hidden_type_func {$$ = createTree(hidden_type_non_recv_chan, "hidden_type_non_recv_chan", 1, $1);}
-	;
-
-hidden_type_misc:
-	hidden_importsym {$$ = createTree(hidden_type_misc, "hidden_type_misc", 1, $1);}
-|	LNAME {$$ = createTree(hidden_type_misc, "hidden_type_misc", 1, $1);}
-|	LSQUAREBRACE RSQUAREBRACE hidden_type {$$ = createTree(hidden_type_misc, "hidden_type_misc", 3, $1, $2, $3);}
-|	LSQUAREBRACE lliteral RSQUAREBRACE hidden_type {$$ = createTree(hidden_type_misc, "hidden_type_misc", 4, $1, $2, $3, $4);}
-|	LMAP LSQUAREBRACE hidden_type RSQUAREBRACE hidden_type {$$ = createTree(hidden_type_misc, "hidden_type_misc", 5, $1, $2, $3, $4, $5);}
-|	LSTRUCT LBRACKET ohidden_structdcl_list RBRACKET {$$ = createTree(hidden_type_misc, "hidden_type_misc", 4, $1, $2, $3, $4);}
-|	LINTERFACE LBRACKET ohidden_interfacedcl_list RBRACKET {$$ = createTree(hidden_type_misc, "hidden_type_misc", 4, $1, $2, $3, $4);}
-|	STAR hidden_type {$$ = createTree(hidden_type_misc, "hidden_type_misc", 2, $1, $2);}
-|	LCHAN hidden_type_non_recv_chan {$$ = createTree(hidden_type_misc, "hidden_type_misc", 2, $1, $2);}
-|	LCHAN LPAREN hidden_type_recv_chan RPAREN {$$ = createTree(hidden_type_misc, "hidden_type_misc", 4, $1, $2, $3, $4);}
-|	LCHAN LCOMM hidden_type {$$ = createTree(hidden_type_misc, "hidden_type_misc", 3, $1, $2, $3);}
-	;
-
-hidden_type_recv_chan:
-	LCOMM LCHAN hidden_type {$$ = createTree(hidden_type_recv_chan, "hidden_type_recv_chan", 3, $1, $2, $3);}
-	;
-
-hidden_type_func:
-	LFUNC LPAREN ohidden_funarg_list RPAREN ohidden_funres {$$ = createTree(hidden_type_func, "hidden_type_func", 5, $1, $2, $3, $4, $5);}
-	;
-
-hidden_funarg:
-	sym hidden_type oliteral {$$ = createTree(hidden_funarg, "hidden_funarg", 3, $1, $2, $3);}
-|	sym LDDD hidden_type oliteral {$$ = createTree(hidden_funarg, "hidden_funarg", 4, $1, $2, $3, $4);}
-	;
-
-hidden_structdcl:
-	sym hidden_type oliteral {$$ = createTree(hidden_structdcl, "hidden_structdcl", 3, $1, $2, $3);}
-	;
-
-hidden_interfacedcl:
-	sym LPAREN ohidden_funarg_list RPAREN ohidden_funres {$$ = createTree(hidden_interfacedcl, "hidden_interfacedcl", 5, $1, $2, $3, $4, $5);}
-|	hidden_type {$$ = createTree(hidden_interfacedcl, "hidden_interfacedcl", 1, $1);}
-	;
-
-ohidden_funres:
-	hidden_funres {$$ = createTree(ohidden_funres, "ohidden_funres", 1, $1);}
-	;
-
-hidden_funres:
-	LPAREN ohidden_funarg_list RPAREN {$$ = createTree(hidden_funres, "hidden_funres", 3, $1, $2, $3);}
-|	hidden_type {$$ = createTree(hidden_funres, "hidden_funres", 1, $1);}
-	;
-
-/*
- *  importing constants
- */
-
-hidden_literal:
-	lliteral {$$ = createTree(hidden_literal, "hidden_literal", 1, $1);}
-|	MINUS lliteral {$$ = createTree(hidden_literal, "hidden_literal", 2, $1, $2);}
-|	sym {$$ = createTree(hidden_literal, "hidden_literal", 1, $1);}
-	;
-
-hidden_constant:
-	hidden_literal {$$ = createTree(hidden_constant, "hidden_constant", 1, $1);}
-|	LPAREN hidden_literal PLUS hidden_literal RPAREN {$$ = createTree(hidden_constant, "hidden_constant", 5, $1, $2, $3, $4, $5);}
-	;
-
-hidden_import_list:
-	hidden_import_list hidden_import {$$ = createTree(hidden_import_list, "hidden_import_list", 2, $1, $2);}
-	;
-
-hidden_funarg_list:
-	hidden_funarg {$$ = createTree(hidden_funarg_list, "hidden_funarg_list", 1, $1);}
-|	hidden_funarg_list COMA hidden_funarg {$$ = createTree(hidden_funarg_list, "hidden_funarg_list", 3, $1, $2, $3);}
-	;
-
-hidden_structdcl_list:
-	hidden_structdcl {$$ = createTree(hidden_structdcl_list, "hidden_structdcl_list", 1, $1);}
-|	hidden_structdcl_list semicolon hidden_structdcl {$$ = createTree(hidden_structdcl_list, "hidden_structdcl_list", 3, $1, $2, $3);}
-	;
-
-hidden_interfacedcl_list:
-	hidden_interfacedcl {$$ = createTree(hidden_interfacedcl_list, "hidden_interfacedcl_list", 1, $1);}
-|	hidden_interfacedcl_list semicolon hidden_interfacedcl {$$ = createTree(hidden_interfacedcl_list, "hidden_interfacedcl_list", 3, $1, $2, $3);}
 	;
 
 semicolon:
@@ -927,3 +720,4 @@ type:
 |	FLOAT64 {$$ = $1;}
 |	STRING {$$ = $1;}
 %%
+ 

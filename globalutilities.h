@@ -3,6 +3,9 @@
 
 #include "vgobison.tab.h"
 #include <stdio.h>
+#include "tree.h"
+
+int printCode;
 
 extern int yylineno;
 extern char *yytext;
@@ -13,5 +16,7 @@ char *currentfile;
 extern int yylex();
 int yyerror(char *string);
 extern YYSTYPE yylval;
+
+struct Node *treeHead;
 
 #endif

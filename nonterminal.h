@@ -51,7 +51,6 @@
 #define onew_name 10047
 #define sym 10048
 #define hidden_importsym 10049
-#define name 10050
 #define labelname 10051
 #define dotdotdot 10052
 #define ntype 10053
@@ -127,5 +126,6 @@
 #define hidden_interfacedcl_list 10123
 #define constdcl1 10124
 #define lliteral 10125
+#define function 10500
 
 #endif

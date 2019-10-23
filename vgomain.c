@@ -6,6 +6,8 @@
 
 #include "vgobison.tab.h"
 #include "globalutilities.h"
+#include "tree.h"
+#include "semantic.h"
 
 // yydebug = 1;
 
@@ -33,31 +35,40 @@ int main(int argc, char **argv)
         int i;
         for (i = 1; i < argc; i++)
         {
-            char *sanatizedFile = sanitizeFile(argv[i]);
-            if (sizeof(sanatizedFile) > 0)
+            if (strcmp(argv[i], "-symtab") == 0)
             {
-                // valid file feel free to continue
-
-                yyin = fopen(sanatizedFile, "r");
-                currentfile = sanatizedFile;
-
-                if (yyin == NULL)
-                {
-                    // do note that it is possible that this is a valid .go file but the user will resubmit if that happens
-                    perror("This is not a .go file\n");
-                }
-                else
-                {
-                    while (yyparse() > 0)
-                    {
-                    }
-
-                    fclose(yyin);
-                }
+                printCode = 3;
             }
             else
             {
-                return 1;
+                char *sanatizedFile = sanitizeFile(argv[i]);
+                if (sizeof(sanatizedFile) > 0)
+                {
+                    // valid file feel free to continue
+
+                    yyin = fopen(sanatizedFile, "r");
+                    currentfile = sanatizedFile;
+
+                    if (yyin == NULL)
+                    {
+                        // do note that it is possible that this is a valid .go file but the user will resubmit if that happens
+                        perror("This is not a .go file\n");
+                    }
+                    else
+                    {
+                        // run flex/bison. They will create a treeHead object we can then use for semantic analysis
+                        while (yyparse() > 0)
+                        {
+                        }
+                        beginSemanticAnalysis(treeHead);
+
+                        fclose(yyin);
+                    }
+                }
+                else
+                {
+                    return 1;
+                }
             }
         }
         return 0;
@@ -68,6 +79,3 @@ int main(int argc, char **argv)
         return 1;
     }
 }
-
-// notes
-// string escape characters char escape characters
