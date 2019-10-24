@@ -239,7 +239,6 @@ void lookForVariableNames(struct Node *treeHead, int type, char *typeName)
         if (arraySize != -1)
         {
             treeHead->children[0]->children[0]->data->ival = arraySize;
-
             arraySize = -1;
         }
         insertVariableIntoHash(treeHead->children[0]->children[0], type, typeName, currentSymbolTable);
@@ -287,6 +286,7 @@ void handleVariableDeclaration(struct Node *treeHead)
 {
     int type;
     char *typeName;
+
     if (treeHead->children[1] != NULL && treeHead->children[1]->numberOfChildren == 0)
     {
         // regular variable declaration
@@ -302,10 +302,26 @@ void handleVariableDeclaration(struct Node *treeHead)
         // array declaration
         if (treeHead->children[1]->category == othertype)
         {
-            type = treeHead->children[1]->children[treeHead->children[1]->numberOfChildren - 1]->data->category;
-            typeName = strdup(treeHead->children[1]->children[treeHead->children[1]->numberOfChildren - 1]->data->text);
-            arraySize = treeHead->children[1]->children[1]->children[0]->data->ival;
-            lookForVariableNames(treeHead->children[0], type, typeName);
+            if (treeHead->children[1]->children[1] == NULL)
+            {
+                printf("Array declarations need to have a size found\n");
+                exit(3);
+            }
+            else
+            {
+                type = treeHead->children[1]->children[treeHead->children[1]->numberOfChildren - 1]->data->category;
+                typeName = strdup(treeHead->children[1]->children[treeHead->children[1]->numberOfChildren - 1]->data->text);
+                if (treeHead->children[1]->children[1]->children[0]->data->category == LNAME)
+                {
+                    printf("Found variable instead of a size in array\n");
+                    exit(3);
+                }
+                else
+                {
+                    arraySize = treeHead->children[1]->children[1]->children[0]->data->ival;
+                    lookForVariableNames(treeHead->children[0], type, typeName);
+                }
+            }
         }
     }
 }
