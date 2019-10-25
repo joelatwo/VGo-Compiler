@@ -13,7 +13,7 @@ int structSymbolTableLastIndex = 0;
 
 struct symboltable *createSymbolTable(char *tableName, struct symboltable *parent)
 {
-    struct symboltable *newSymbolTable = malloc(sizeof(struct symboltable));
+  struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
     return newSymbolTable;
@@ -118,7 +118,7 @@ void addToFunctionList(struct symboltable *currentSymbolTable)
 
 struct symboltable *createStructTable(char *tableName, struct symboltable *parent)
 {
-    struct symboltable *newSymbolTable = malloc(sizeof(struct symboltable));
+  struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
 
@@ -178,4 +178,60 @@ void insertDeclarationPropertyList(struct symboltable *currentSymbolTable)
         }
         current = current->next;
     }
+}
+
+int findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
+{
+    printf("What type is %s?\n", variableName);
+    // printSymbolTable(currentSymbolTable);
+    int index = -1;
+    index = calculateHashKey(variableName);
+
+    int potentialType = findTypeInLinkedList(variableName, currentSymbolTable->hash[index]);
+    if (potentialType != -1)
+    {
+        // found it
+        printf("~~~~~~~~~~~~~Type is %d\n", potentialType);
+    }
+    // check global
+    if (currentSymbolTable->parent != NULL)
+    {
+        potentialType = findTypeInLinkedList(variableName, currentSymbolTable->parent->hash[index]);
+        if (potentialType != -1)
+        {
+            // found it
+            printf("~~~~~~~~~~~~~Type is %d\n", potentialType);
+        }
+    }
+
+    // check struct table
+    int i = 0;
+    for (i = 0; i < structSymbolTableLastIndex; i++)
+    {
+        if (strcmp(structSymbolTable[i]->tablename, variableName) == 0)
+        {
+            return -1;
+        }
+        potentialType = findTypeInLinkedList(variableName, structSymbolTable[i]->hash[index]);
+        if (potentialType != -1)
+        {
+            return potentialType;
+        }
+    }
+    // check function tables
+    for (i = 0; i < functionSymbolTableLastIndex; i++)
+    {
+        if (strcmp(functionSymbolTable[i]->tablename, variableName) == 0)
+        {
+            return -1;
+        }
+        potentialType = findTypeInLinkedList(variableName, functionSymbolTable[i]->hash[index]);
+        if (potentialType != -1)
+        {
+            return potentialType;
+        }
+    }
+
+    // haven't found it anywhere
+    return -1;
 }
