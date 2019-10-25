@@ -21,6 +21,7 @@ void handleImportPackage(struct Node *treeHead);
 void handleStruct(struct Node *treeHead);
 void handleFunctionDeclaration(struct Node *treeHead);
 void handleVariableDeclaration(struct Node *treeHead);
+void handlePotentialStructInstance(struct Node *treeHead);
 void lookForVariableNames(struct Node *treeHead, int type, char *typeName);
 void lookForParameterNames(struct Node *treeHead);
 void lookForReturnTypes(struct Node *treeHead);
@@ -72,6 +73,10 @@ void scopeAnalysis(struct Node *treeHead)
 
         case vardcl:
             handleVariableDeclaration(treeHead);
+            break;
+
+        case pexpr_no_paren:
+            handlePotentialStructInstance(treeHead);
             break;
 
         case LNAME:
@@ -304,7 +309,7 @@ void handleVariableDeclaration(struct Node *treeHead)
         {
             if (treeHead->children[1]->children[1] == NULL)
             {
-                printf("Array declarations need to have a size found\n");
+                printf("Array declarations need to have a size on line %d\n", treeHead->children[1]->children[0]->data->linenumber);
                 exit(3);
             }
             else
@@ -323,6 +328,69 @@ void handleVariableDeclaration(struct Node *treeHead)
                 }
             }
         }
+    }
+}
+
+void handlePotentialStructInstance(struct Node *treeHead)
+{
+    // treeprint(treeHead, 0);
+    if (treeHead->numberOfChildren >= 3)
+    {
+        if (treeHead->children[1]->data->category == PERIOD)
+        {
+            if (strcmp(treeHead->children[0]->children[0]->data->text, "fmt") == 0)
+            {
+                if (strcmp(treeHead->children[2]->data->text, "Println") != 0)
+                {
+                    printf("That isn't a Println its a %s\n", treeHead->children[1]->data->text);
+                    exit(3);
+                }
+            }
+            else if (strcmp(treeHead->children[0]->children[0]->data->text, "time") == 0)
+            {
+                if (strcmp(treeHead->children[2]->data->text, "Now") != 0)
+                {
+                    printf("That isn't a Now its a %s\n", treeHead->children[1]->data->text);
+                    exit(3);
+                }
+            }
+            else if (strcmp(treeHead->children[0]->children[0]->data->text, "math/rand") == 0)
+            {
+                if (strcmp(treeHead->children[2]->data->text, "Intn") != 0)
+                {
+                    printf("That isn't a Intn its a %s\n", treeHead->children[1]->data->text);
+                    exit(3);
+                }
+            }
+            else
+            {
+                // we found a struct instance
+                int index = calculateHashKey(treeHead->children[2]->data->text);
+                char *typeName = findTypeInSymbolTable(currentSymbolTable, treeHead->children[0]->children[0]->data->text);
+                if (strlen(typeName) > 0)
+                {
+                    int returnIsVariableInTable = isVariableInTable(findStructTable(typeName), index, treeHead->children[2]->data->text);
+                    if (returnIsVariableInTable == 1 || returnIsVariableInTable == 2)
+                    {
+                        // do nothing this is valid
+                    }
+                    else
+                    {
+                        printf("%s.%s is not in the current scope\n", treeHead->children[0]->children[0]->data->text, treeHead->children[2]->data->text);
+                        exit(3);
+                    }
+                }
+                else
+                {
+                    printf("%s.%s is not in the current scope\n", treeHead->children[0]->children[0]->data->text, treeHead->children[2]->data->text);
+                    exit(3);
+                }
+            }
+        }
+    }
+    else
+    {
+        checkChildren(treeHead);
     }
 }
 
@@ -350,7 +418,7 @@ void lookForParameterNames(struct Node *treeHead)
             newData->typeName = strdup(typeName);
             currentSymbolTable->declarationPropertyList = addToEnd(newData, currentSymbolTable->declarationPropertyList);
 
-            // insertVariableIntoHash(treeHead->children[0], type, typeName, currentSymbolTable);
+            insertVariableIntoHash(treeHead->children[0], type, typeName, currentSymbolTable);
         }
     }
     else

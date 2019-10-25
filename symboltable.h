@@ -25,5 +25,7 @@ struct symboltable *createStructTable(char *tableName, struct symboltable *paren
 void insertDeclarationPropertyList(struct symboltable *currentSymbolTable);
 int isVariableInTable(struct symboltable *currentSymbolTable, int index, char *variableName);
 void printSymbolTable(struct symboltable *currentSymbolTable);
+struct symboltable *findStructTable(char *variableName);
+char *findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName);
 
 #endif

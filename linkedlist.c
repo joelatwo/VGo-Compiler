@@ -130,3 +130,34 @@ int isVariableInLinkedList(char *variableName, struct LinkedListNode *head)
     }
     return 0;
 }
+
+char *findTypeInLinkedList(char *variableName, struct LinkedListNode *head)
+{
+    struct LinkedListNode *current = head;
+    if (head == NULL)
+    {
+        printf("head\n");
+        return "";
+    }
+    else
+    {
+        if (strcmp(current->data->name, variableName) == 0)
+        {
+            return current->data->typeName;
+        }
+        // traverse to end
+        while (current->next != NULL)
+        {
+            if (strcmp(current->data->name, variableName) == 0)
+            {
+                // found it
+                return current->data->typeName;
+            }
+            else
+            {
+                current = current->next;
+            }
+        }
+    }
+    return "";
+}

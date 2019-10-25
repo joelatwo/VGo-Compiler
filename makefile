@@ -38,3 +38,5 @@ linkedlist.o: linkedlist.c linkedlist.h
 
 clean:
 	rm $(OBJ)
+	rm vgobison.tab.c
+	rm lex.yy.c

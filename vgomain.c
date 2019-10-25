@@ -39,6 +39,10 @@ int main(int argc, char **argv)
             {
                 printCode = 3;
             }
+            else if (strcmp(argv[i], "-tree") == 0)
+            {
+                printCode = 2;
+            }
             else
             {
                 char *sanatizedFile = sanitizeFile(argv[i]);
@@ -59,6 +63,10 @@ int main(int argc, char **argv)
                         // run flex/bison. They will create a treeHead object we can then use for semantic analysis
                         while (yyparse() > 0)
                         {
+                        }
+                        if (printCode == 2)
+                        {
+                            treeprint(treeHead, 0);
                         }
                         beginSemanticAnalysis(treeHead);
 

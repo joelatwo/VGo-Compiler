@@ -13,7 +13,7 @@ int structSymbolTableLastIndex = 0;
 
 struct symboltable *createSymbolTable(char *tableName, struct symboltable *parent)
 {
-  struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
+    struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
     return newSymbolTable;
@@ -38,7 +38,8 @@ int calculateHashKey(char *string)
 void insertVariableIntoHash(struct Node *terminal, int type, char *typeName, struct symboltable *currentSymbolTable)
 {
     int index = calculateHashKey(terminal->data->text);
-    if (isVariableInTable(currentSymbolTable, index, terminal->data->text) == 0)
+    int whereIsVariableInTable = isVariableInTable(currentSymbolTable, index, terminal->data->text);
+    if (whereIsVariableInTable == 0 || whereIsVariableInTable == 2)
     {
         struct Symbol *newData = malloc(sizeof(struct Symbol));
         newData->name = strdup(terminal->data->text);
@@ -76,7 +77,7 @@ int isVariableInTable(struct symboltable *currentSymbolTable, int index, char *v
     {
         if (isVariableInLinkedList(variableName, currentSymbolTable->parent->hash[index]) == 1)
         {
-            return 1;
+            return 2;
         }
     }
     // check struct table
@@ -89,7 +90,7 @@ int isVariableInTable(struct symboltable *currentSymbolTable, int index, char *v
         }
         else if (isVariableInLinkedList(variableName, structSymbolTable[i]->hash[index]) == 1)
         {
-            return 1;
+            return 3;
         }
     }
     // check function tables
@@ -97,7 +98,7 @@ int isVariableInTable(struct symboltable *currentSymbolTable, int index, char *v
     {
         if (strcmp(functionSymbolTable[i]->tablename, variableName) == 0)
         {
-            return 1;
+            return 4;
         }
     }
 
@@ -118,7 +119,7 @@ void addToFunctionList(struct symboltable *currentSymbolTable)
 
 struct symboltable *createStructTable(char *tableName, struct symboltable *parent)
 {
-  struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
+    struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
 
@@ -180,58 +181,31 @@ void insertDeclarationPropertyList(struct symboltable *currentSymbolTable)
     }
 }
 
-int findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
+struct symboltable *findStructTable(char *variableName)
 {
-    printf("What type is %s?\n", variableName);
-    // printSymbolTable(currentSymbolTable);
-    int index = -1;
-    index = calculateHashKey(variableName);
-
-    int potentialType = findTypeInLinkedList(variableName, currentSymbolTable->hash[index]);
-    if (potentialType != -1)
-    {
-        // found it
-        printf("~~~~~~~~~~~~~Type is %d\n", potentialType);
-    }
-    // check global
-    if (currentSymbolTable->parent != NULL)
-    {
-        potentialType = findTypeInLinkedList(variableName, currentSymbolTable->parent->hash[index]);
-        if (potentialType != -1)
-        {
-            // found it
-            printf("~~~~~~~~~~~~~Type is %d\n", potentialType);
-        }
-    }
-
-    // check struct table
     int i = 0;
     for (i = 0; i < structSymbolTableLastIndex; i++)
     {
         if (strcmp(structSymbolTable[i]->tablename, variableName) == 0)
         {
-            return -1;
-        }
-        potentialType = findTypeInLinkedList(variableName, structSymbolTable[i]->hash[index]);
-        if (potentialType != -1)
-        {
-            return potentialType;
+            return structSymbolTable[i];
         }
     }
-    // check function tables
-    for (i = 0; i < functionSymbolTableLastIndex; i++)
-    {
-        if (strcmp(functionSymbolTable[i]->tablename, variableName) == 0)
-        {
-            return -1;
-        }
-        potentialType = findTypeInLinkedList(variableName, functionSymbolTable[i]->hash[index]);
-        if (potentialType != -1)
-        {
-            return potentialType;
-        }
-    }
+    printf("Unable to find struct symbol table '%s'\n", variableName);
+    exit(3);
+}
 
-    // haven't found it anywhere
-    return -1;
+char *findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
+{
+    int index = calculateHashKey(variableName);
+
+    char *typeName = findTypeInLinkedList(variableName, currentSymbolTable->hash[index]);
+    if (strlen(typeName) == 0)
+    {
+        return "";
+    }
+    else
+    {
+        return typeName;
+    }
 }

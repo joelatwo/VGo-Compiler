@@ -27,5 +27,6 @@ void updateWithNextTypeInformation(struct LinkedListNode *current);
 void handleMissingTypes(struct LinkedListNode *head);
 void printLinkedList(struct LinkedListNode *head);
 int isVariableInLinkedList(char *variableName, struct LinkedListNode *head);
+char *findTypeInLinkedList(char *variableName, struct LinkedListNode *head);
 
 #endif
