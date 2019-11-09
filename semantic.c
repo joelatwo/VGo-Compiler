@@ -13,6 +13,10 @@
 struct symboltable *globalSymbolTable;
 struct symboltable *currentSymbolTable;
 
+struct symboltable *fmtSymbolTable;
+struct symboltable *timeSymbolTable;
+struct symboltable *mathSymbolTable;
+
 void scopeAnalysis(struct Node *treeHead);
 void checkChildren(struct Node *treeHead);
 void printChildren(struct Node *treeHead);
@@ -29,7 +33,20 @@ void handleVariableInstance(struct Node *treeHead);
 void lookForStructVariables(struct Node *treeHead, struct symboltable *currentStruct);
 void findConstName(struct Node *treeHead, int type, char *typeName);
 void handleConst(struct Node *treeHead);
+int typeAnalysis(struct Node *treeHead);
+int checkTypeChildren(struct Node *treeHead);
+int findTerminal(struct Node *treeHead);
+char *getTerminalText(struct Node *treeHead);
+void checkTypeFunctionDeclaration(struct Node *treeHead);
+int checkTypeFunctionCall(struct Node *treeHead);
+void checkTypeNonDclStmt(struct Node *treeHead);
+int checkTypeExpression(struct Node *treeHead);
+int checkTypeSimpleStatement(struct Node *treeHead);
+int checkTypepexpr_no_paren(struct Node *treeHead);
+int checkTypeDefault(struct Node *treeHead);
+void checkForHeader(struct Node *treeHead);
 
+struct LinkedListNode *checkParameterTypes(struct symboltable *functionSymbolTable, struct LinkedListNode *listHead, struct Node *treeHead);
 int arraySize = -1;
 
 void beginSemanticAnalysis(struct Node *treeHead)
@@ -43,6 +60,7 @@ void beginSemanticAnalysis(struct Node *treeHead)
         printFunctionSymbolTable();
         printStructSymbolTable();
     }
+    typeAnalysis(treeHead);
 }
 
 void scopeAnalysis(struct Node *treeHead)
@@ -75,10 +93,6 @@ void scopeAnalysis(struct Node *treeHead)
             handleVariableDeclaration(treeHead);
             break;
 
-        case pexpr_no_paren:
-            handlePotentialStructInstance(treeHead);
-            break;
-
         case LNAME:
             handleVariableInstance(treeHead);
             break;
@@ -87,6 +101,138 @@ void scopeAnalysis(struct Node *treeHead)
             checkChildren(treeHead);
             break;
         }
+    }
+}
+
+int typeAnalysis(struct Node *treeHead)
+{
+
+    if (treeHead != NULL)
+    {
+        switch (treeHead->category)
+        {
+        case xfndcl:
+            checkTypeFunctionDeclaration(treeHead);
+            break;
+
+        case pseudocall:
+            return checkTypeFunctionCall(treeHead);
+            break;
+
+        case non_dcl_stmt:
+            checkTypeNonDclStmt(treeHead);
+            break;
+
+        case expr:
+            return checkTypeExpression(treeHead);
+            break;
+
+        case simple_stmt:
+            return checkTypeSimpleStatement(treeHead);
+            break;
+
+        case pexpr_no_paren:
+            checkTypepexpr_no_paren(treeHead);
+            break;
+
+        case for_header:
+            checkForHeader(treeHead);
+            break;
+
+        default:
+            return checkTypeDefault(treeHead);
+            break;
+        }
+    }
+    // backup return in case its an issue
+    return -1;
+}
+
+struct LinkedListNode *checkParameterTypes(struct symboltable *functionSymbolTable, struct LinkedListNode *listHead, struct Node *treeHead)
+{
+
+    if (treeHead == NULL)
+    {
+        // do nothing
+    }
+    else if (treeHead->numberOfChildren > 0)
+    {
+        int i = 0;
+        for (i = 0; i < treeHead->numberOfChildren; i++)
+        {
+
+            listHead = checkParameterTypes(functionSymbolTable, listHead, treeHead->children[i]);
+        }
+    }
+    else if (treeHead->data->category == COMA)
+    {
+        // do nothing we have a ,
+    }
+    else
+    {
+        struct Symbol *newData = calloc(1, sizeof(struct Symbol));
+        if (treeHead->data->category == NUMERICLITERAL)
+        {
+            newData->type = INT;
+        }
+        else
+        {
+
+            newData->type = treeHead->data->category;
+        }
+        newData->name = treeHead->data->text;
+        newData->typeName = findTypeName(newData->type);
+        newData->arraySize = -1;
+        newData->isConst = 0;
+        listHead = addToEnd(newData, listHead);
+    }
+    return listHead;
+}
+
+int checkTypeChildren(struct Node *treeHead)
+{
+    int i = 0;
+    if (treeHead != NULL)
+    {
+        if (treeHead->numberOfChildren == 1)
+        {
+            return typeAnalysis(treeHead->children[0]);
+        }
+        else
+        {
+            for (i = 0; i < treeHead->numberOfChildren; i++)
+            {
+                int currentType = typeAnalysis(treeHead->children[i]);
+                if (currentType > 0)
+                {
+                }
+            }
+        }
+    }
+    return -1;
+}
+
+int findTerminal(struct Node *treeHead)
+{
+    if (treeHead == NULL)
+    {
+        return -1;
+    }
+    else if (treeHead->numberOfChildren > 0)
+    {
+        return findTerminal(treeHead->children[0]);
+    }
+    else if (treeHead->data->category == LNAME)
+    {
+        return findTypeInSymbolTable(currentSymbolTable, treeHead->data->text);
+    }
+    else
+    {
+        if (treeHead->data->category == NUMERICLITERAL)
+        {
+            return INT;
+        }
+        return treeHead->data->category;
     }
 }
 
@@ -135,36 +281,36 @@ void handleImportPackage(struct Node *treeHead)
 {
     if (strcmp(treeHead->children[0]->data->sval, "fmt") == 0)
     {
-        struct symboltable *packagetable = createStructTable("fmt", globalSymbolTable);
+        fmtSymbolTable = createStructTable("fmt", globalSymbolTable);
         int index = calculateHashKey("Println");
 
         struct Symbol *newData = malloc(sizeof(struct Symbol));
         newData->name = "Println";
         newData->type = function;
         newData->typeName = "function";
-        packagetable->hash[index] = addToFront(newData, packagetable->hash[index]);
+        fmtSymbolTable->hash[index] = addToFront(newData, fmtSymbolTable->hash[index]);
     }
     else if (strcmp(treeHead->children[0]->data->sval, "time") == 0)
     {
-        struct symboltable *packagetable = createStructTable("time", globalSymbolTable);
+        timeSymbolTable = createStructTable("time", globalSymbolTable);
         int index = calculateHashKey("Now");
 
         struct Symbol *newData = malloc(sizeof(struct Symbol));
         newData->name = "Now";
         newData->type = function;
         newData->typeName = "function";
-        packagetable->hash[index] = addToFront(newData, packagetable->hash[index]);
+        timeSymbolTable->hash[index] = addToFront(newData, timeSymbolTable->hash[index]);
     }
     else if (strcmp(treeHead->children[0]->data->sval, "math/rand") == 0)
     {
-        struct symboltable *packagetable = createStructTable("math/rand", globalSymbolTable);
+        mathSymbolTable = createStructTable("math/rand", globalSymbolTable);
         int index = calculateHashKey("Intn");
 
         struct Symbol *newData = malloc(sizeof(struct Symbol));
         newData->name = "Intn";
         newData->type = function;
         newData->typeName = "function";
-        packagetable->hash[index] = addToFront(newData, packagetable->hash[index]);
+        mathSymbolTable->hash[index] = addToFront(newData, mathSymbolTable->hash[index]);
     }
     else
     {
@@ -184,7 +330,6 @@ void handleStruct(struct Node *treeHead)
 
 void handleFunctionDeclaration(struct Node *treeHead)
 {
-
     if (treeHead->children[1]->category == fndcl)
     {
         if (treeHead->children[1]->children[0]->data != NULL)
@@ -212,6 +357,16 @@ void handleFunctionDeclaration(struct Node *treeHead)
             if (treeHead->children[1]->numberOfChildren == 3)
             {
                 lookForReturnTypes(treeHead->children[1]->children[2]);
+                if (currentSymbolTable->returnType == 0)
+                {
+                    currentSymbolTable->returnType = VOID;
+                    currentSymbolTable->returnTypeName = "void";
+                }
+            }
+            else
+            {
+                currentSymbolTable->returnType = VOID;
+                currentSymbolTable->returnTypeName = "void";
             }
         }
     }
@@ -285,6 +440,12 @@ void lookForReturnTypes(struct Node *treeHead)
         currentSymbolTable->returnType = treeHead->data->category;
         currentSymbolTable->returnTypeName = strdup(treeHead->data->text);
     }
+    else
+    {
+        printf("Error found in the following tree\n");
+        treeprint(treeHead, 0);
+        exit(3);
+    }
 }
 
 void handleVariableDeclaration(struct Node *treeHead)
@@ -333,7 +494,6 @@ void handleVariableDeclaration(struct Node *treeHead)
 
 void handlePotentialStructInstance(struct Node *treeHead)
 {
-    // treeprint(treeHead, 0);
     if (treeHead->numberOfChildren >= 3)
     {
         if (treeHead->children[1]->data->category == PERIOD)
@@ -365,20 +525,21 @@ void handlePotentialStructInstance(struct Node *treeHead)
             else
             {
                 // we found a struct instance
-                int index = calculateHashKey(treeHead->children[2]->data->text);
-                char *typeName = findTypeInSymbolTable(currentSymbolTable, treeHead->children[0]->children[0]->data->text);
-                if (strlen(typeName) > 0)
+                // int index = calculateHashKey(treeHead->children[2]->data->text);
+                int typeName = findTypeInSymbolTable(currentSymbolTable, treeHead->children[0]->children[0]->data->text);
+                if (typeName > 0)
                 {
-                    int returnIsVariableInTable = isVariableInTable(findStructTable(typeName), index, treeHead->children[2]->data->text);
-                    if (returnIsVariableInTable == 1 || returnIsVariableInTable == 2)
-                    {
-                        // do nothing this is valid
-                    }
-                    else
-                    {
-                        printf("%s.%s is not in the current scope\n", treeHead->children[0]->children[0]->data->text, treeHead->children[2]->data->text);
-                        exit(3);
-                    }
+                    // struct symboltable *variableSymbolTable = findStructTable(typeName);
+                    // int returnIsVariableInTable = isVariableInTable(variableSymbolTable, index, treeHead->children[2]->data->text);
+                    // if (returnIsVariableInTable == 1 || returnIsVariableInTable == 2)
+                    // {
+                    //     // do nothing this is valid
+                    // }
+                    // else
+                    // {
+                    //     printf("%s.%s is not in the current scope\n", treeHead->children[0]->children[0]->data->text, treeHead->children[2]->data->text);
+                    //     exit(3);
+                    // }
                 }
                 else
                 {
@@ -502,6 +663,346 @@ void findConstName(struct Node *treeHead, int type, char *typeName)
         for (i = 0; i < treeHead->numberOfChildren; i++)
         {
             findConstName(treeHead->children[i], type, typeName);
+        }
+    }
+}
+
+char *getTerminalText(struct Node *treeHead)
+{
+    if (treeHead != NULL)
+    {
+        if (treeHead->numberOfChildren == 0)
+        {
+            return treeHead->data->text;
+        }
+        else
+        {
+            return getTerminalText(treeHead->children[0]);
+        }
+    }
+    else
+    {
+        printf("Empty tree missing variable name\n");
+        exit(3);
+    }
+}
+
+void checkTypeFunctionDeclaration(struct Node *treeHead)
+{
+    if (treeHead->children[1]->category == fndcl)
+    {
+        if (treeHead->children[1]->children[0]->data != NULL)
+        {
+            currentSymbolTable = findSymbolTable(treeHead->children[1]->children[0]->data->text);
+        }
+    }
+    if (treeHead->numberOfChildren == 3)
+    {
+        if (treeHead->children[2]->category == fnbody)
+        {
+            checkTypeChildren(treeHead->children[2]);
+            if (currentSymbolTable->parent != NULL)
+            {
+                currentSymbolTable = currentSymbolTable->parent;
+            }
+        }
+    }
+}
+
+int checkTypeFunctionCall(struct Node *treeHead)
+{
+    if (treeHead->numberOfChildren > 0)
+    {
+        if (treeHead->children[0]->numberOfChildren > 0)
+        {
+            if (treeHead->children[0]->children[0]->numberOfChildren == 0)
+            {
+                if (strcmp(treeHead->children[0]->children[0]->data->text, "fmt") == 0)
+                {
+                    // currentSymbolTable = fmtSymbolTable;
+                }
+                else if (strcmp(treeHead->children[0]->children[0]->data->text, "time") == 0)
+                {
+                    // currentSymbolTable = timeSymbolTable;
+                }
+                else if (strcmp(treeHead->children[0]->children[0]->data->text, "Math/rand") == 0)
+                {
+                    // currentSymbolTable = mathSymbolTable;
+                }
+                else
+                {
+                    currentSymbolTable = findSymbolTable(treeHead->children[0]->children[0]->data->text);
+                }
+            }
+            else if (treeHead->children[0]->children[0]->numberOfChildren == 1)
+            {
+                char *variableName = getTerminalText(treeHead->children[0]->children[0]);
+                if (strcmp(variableName, "fmt") == 0)
+                {
+                    // currentSymbolTable = fmtSymbolTable;
+                    return VOID;
+                }
+                else if (strcmp(variableName, "time") == 0)
+                {
+                    // currentSymbolTable = timeSymbolTable;
+                    return INT;
+                }
+                else if (strcmp(variableName, "Math/rand") == 0)
+                {
+                    // currentSymbolTable = mathSymbolTable;
+                    return INT;
+                }
+                else
+                {
+                    checkTypeChildren(treeHead->children[0]->children[0]);
+                }
+            }
+            else
+            {
+                printf("Unable to find function in the following tree\n");
+                treeprint(treeHead, 0);
+                exit(3);
+            }
+        }
+    }
+
+    // check parameter list
+    if (currentSymbolTable->declarationPropertyList != NULL)
+    {
+        if (treeHead->numberOfChildren == 3)
+        {
+            printf("There are parameters for function %s but parameters were not provided\n", currentSymbolTable->tablename);
+            exit(3);
+        }
+        else
+        {
+            struct LinkedListNode *paramTypeHead = malloc(sizeof(struct LinkedListNode));
+            paramTypeHead = NULL;
+            paramTypeHead = checkParameterTypes(currentSymbolTable, paramTypeHead, treeHead->children[2]);
+            if (compareLinkedLists(paramTypeHead, currentSymbolTable->declarationPropertyList) == 0)
+            {
+                printf("Error called function %s called with a the following types\n", currentSymbolTable->tablename);
+                printLinkedList(paramTypeHead);
+                exit(3);
+            }
+        }
+    }
+    else if (treeHead->numberOfChildren == 5 || treeHead->numberOfChildren == 4)
+    {
+        printf("There are no parameters for function %s but parameters were provided\n", currentSymbolTable->tablename);
+        exit(3);
+    }
+
+    // check return type
+    return currentSymbolTable->returnType;
+}
+
+void checkTypeNonDclStmt(struct Node *treeHead)
+{
+    int rightType = 0;
+    if (treeHead->numberOfChildren == 2)
+    {
+        if (treeHead->children[0]->numberOfChildren == 0)
+        {
+            rightType = checkTypeChildren(treeHead->children[1]);
+            if (rightType != currentSymbolTable->returnType)
+            {
+                printf("Return type is not the same as the function return type. Expected %s but got %s\n", findTypeName(currentSymbolTable->returnType), findTypeName(rightType));
+                exit(3);
+            }
+        }
+    }
+    else
+    {
+        checkTypeChildren(treeHead);
+    }
+}
+
+int checkTypeExpression(struct Node *treeHead)
+{
+    int leftType = 0;
+    int rightType = 0;
+    leftType = checkTypeChildren(treeHead->children[0]);
+    rightType = findTerminal(treeHead->children[2]);
+    if (leftType == LNAME || rightType == LNAME)
+    {
+        printf("Error found type struct on operaion '%s' on line %d\n", treeHead->children[1]->data->text, treeHead->children[1]->data->linenumber);
+        exit(3);
+    }
+    else if (compareLeftAndRightTypes(leftType, rightType))
+    {
+        switch (treeHead->children[1]->category)
+        {
+        case LLT:
+        case LGT:
+        case LLE:
+        case LGE:
+        case LANDAND:
+        case LOROR:
+            return BOOL;
+
+        default:
+            return leftType;
+        }
+    }
+    else
+    {
+        printf("Error type '%s' != type '%s' in operation '%s' on line %d\n", findTypeName(leftType), findTypeName(rightType), treeHead->children[1]->data->text, treeHead->children[1]->data->linenumber);
+        exit(3);
+    }
+    exit(3);
+    return -1;
+}
+
+int checkTypeSimpleStatement(struct Node *treeHead)
+{
+    int leftType = 0;
+    int rightType = 0;
+    if (treeHead->numberOfChildren == 1)
+    {
+        return checkTypeChildren(treeHead);
+    }
+    else if (treeHead->numberOfChildren == 3)
+    {
+        leftType = typeAnalysis(treeHead->children[0]);
+        rightType = typeAnalysis(treeHead->children[2]);
+        if (compareLeftAndRightTypes(leftType, rightType) == 0)
+        {
+            printf("Error type '%s' != type '%s' in operation '%s' on line %d\n", findTypeName(leftType), findTypeName(rightType), treeHead->children[1]->data->text, treeHead->children[1]->data->linenumber);
+            exit(3);
+        }
+        else
+        {
+            return leftType;
+        }
+    }
+    return -1;
+}
+
+int checkTypepexpr_no_paren(struct Node *treeHead)
+{
+    if (treeHead->numberOfChildren == 0)
+    {
+        return typeAnalysis(treeHead);
+    }
+    if (treeHead->numberOfChildren == 1)
+    {
+        int type = typeAnalysis(treeHead->children[0]);
+        return type;
+    }
+    else if (treeHead->numberOfChildren == 3)
+    {
+        if (treeHead->children[1]->numberOfChildren == 0)
+        {
+            if (treeHead->children[1]->data->category == EQUAL)
+            {
+                int leftType = typeAnalysis(treeHead->children[0]);
+                int rightType = typeAnalysis(treeHead->children[2]);
+                if (compareLeftAndRightTypes(leftType, rightType))
+                {
+                    return leftType;
+                }
+                else
+                {
+                    printf("Attempted operation types %s = %s\n", findTypeName(leftType), findTypeName(rightType));
+                    exit(3);
+                }
+            }
+            else
+            {
+                return checkTypeChildren(treeHead);
+            }
+        }
+    }
+    else if (treeHead->numberOfChildren == 4)
+    {
+        if (treeHead->children[1]->numberOfChildren == 0 && treeHead->children[1]->data->category == LSQUAREBRACE)
+        {
+            if (typeAnalysis(treeHead->children[0]) != typeAnalysis(treeHead->children[2]))
+            {
+                printf("something bad happened\n");
+            }
+        }
+    }
+    else
+    {
+        checkTypeChildren(treeHead);
+    }
+    return -1;
+}
+
+int checkTypeDefault(struct Node *treeHead)
+{
+    // either return a type of a variable or return a type from the children
+    if (treeHead->numberOfChildren == 0)
+    {
+        if (treeHead->data->category == LNAME)
+        {
+            int variableType = findTypeInSymbolTable(currentSymbolTable, treeHead->data->text);
+            return variableType;
+        }
+        else
+        {
+            return treeHead->data->category;
+        }
+    }
+    else if (treeHead->numberOfChildren == 1)
+    {
+        return checkTypeChildren(treeHead);
+    }
+    else
+    {
+        checkTypeChildren(treeHead);
+    }
+    return -1;
+}
+
+void checkForHeader(struct Node *treeHead)
+{
+    if (treeHead->numberOfChildren == 1)
+    {
+        if (treeHead->children[0] == NULL)
+        {
+            // do nothing
+        }
+        else
+        {
+            if (typeAnalysis(treeHead->children[0]) != BOOL)
+            {
+                printf("Error conditional does not have type BOOL instead found the following tree\n");
+                treeprint(treeHead->children[0], 0);
+                exit(3);
+            }
+            else
+            {
+                // do nothing
+            }
+        }
+    }
+    else if (treeHead->children[1]->numberOfChildren == 0 && treeHead->children[1]->data->category == SEMICOLON)
+    {
+        if (typeAnalysis(treeHead->children[2]) != BOOL)
+        {
+            printf("Error conditional does not have type BOOL instead found the following tree\n");
+            treeprint(treeHead->children[2], 0);
+            exit(3);
+        }
+        else
+        {
+            // do nothing
+        }
+    }
+    else
+    {
+        if (typeAnalysis(treeHead->children[1]) != BOOL)
+        {
+            printf("Error conditional does not have type BOOL instead found the following tree\n");
+            treeprint(treeHead->children[1], 0);
+            exit(3);
+        }
+        else
+        {
+            // do nothing
         }
     }
 }

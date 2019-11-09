@@ -127,5 +127,6 @@
 #define constdcl1 10124
 #define lliteral 10125
 #define function 10500
+#define VOID 10501
 
 #endif

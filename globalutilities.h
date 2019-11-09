@@ -16,6 +16,9 @@ char *currentfile;
 extern int yylex();
 int yyerror(char *string);
 extern YYSTYPE yylval;
+char *findTypeName(int typeId);
+int findTypeCategory(int typeId);
+int compareLeftAndRightTypes(int leftType, int righttype);
 
 struct Node *treeHead;
 

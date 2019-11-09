@@ -45,7 +45,6 @@ void printLinkedList(struct LinkedListNode *head)
     struct LinkedListNode *current = head;
     while (current != NULL)
     {
-
         printData(current->data);
         current = current->next;
     }
@@ -89,16 +88,24 @@ void updateWithNextTypeInformation(struct LinkedListNode *current)
 
 void printData(struct Symbol *data)
 {
-    printf("\t%s %s", data->name, data->typeName);
-    if (data->isConst)
+    if (data == NULL)
     {
-        printf(" const");
+        printf("Empty Linked List Found\n");
     }
-    else if (data->arraySize)
+    else
     {
-        printf(" array with size %d", data->arraySize);
+
+        printf("\t%s %s", data->name, data->typeName);
+        if (data->isConst)
+        {
+            printf(" const");
+        }
+        else if (data->arraySize >= 0)
+        {
+            printf(" array with size %d", data->arraySize);
+        }
+        printf("\n");
     }
-    printf("\n");
 }
 
 int isVariableInLinkedList(char *variableName, struct LinkedListNode *head)
@@ -131,13 +138,71 @@ int isVariableInLinkedList(char *variableName, struct LinkedListNode *head)
     return 0;
 }
 
-char *findTypeInLinkedList(char *variableName, struct LinkedListNode *head)
+int findTypeInLinkedList(char *variableName, struct LinkedListNode *head)
 {
     struct LinkedListNode *current = head;
     if (head == NULL)
     {
-        printf("head\n");
-        return "";
+        return -1;
+    }
+    else
+    {
+        if (strcmp(current->data->name, variableName) == 0)
+        {
+            return current->data->type;
+        }
+        // traverse to end
+        while (current->next != NULL)
+        {
+            if (strcmp(current->data->name, variableName) == 0)
+            {
+                // found it
+                return current->data->type;
+            }
+            else
+            {
+                current = current->next;
+            }
+        }
+    }
+    return -1;
+}
+
+int compareLinkedLists(struct LinkedListNode *typeList, struct LinkedListNode *paramList)
+{
+    if (typeList != NULL && paramList != NULL)
+    {
+        struct LinkedListNode *currentType = typeList;
+        struct LinkedListNode *currentParam = paramList;
+
+        while (currentType != NULL && currentParam != NULL)
+        {
+            if (currentType->data->type == currentParam->data->type)
+            {
+                currentType = currentType->next;
+                currentParam = currentParam->next;
+            }
+
+            else
+            {
+                return 0;
+            }
+        }
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+char *findTypeNameInLinkedList(char *variableName, struct LinkedListNode *head)
+{
+    struct LinkedListNode *current = head;
+    if (head == NULL)
+    {
+        printf("Table with name %s is not found\n", variableName);
+        exit(3);
     }
     else
     {
@@ -159,5 +224,7 @@ char *findTypeInLinkedList(char *variableName, struct LinkedListNode *head)
             }
         }
     }
+    printf("Table with name %s is not found\n", variableName);
+    exit(3);
     return "";
 }

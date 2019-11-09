@@ -195,17 +195,31 @@ struct symboltable *findStructTable(char *variableName)
     exit(3);
 }
 
-char *findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
+int findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
 {
     int index = calculateHashKey(variableName);
 
-    char *typeName = findTypeInLinkedList(variableName, currentSymbolTable->hash[index]);
-    if (strlen(typeName) == 0)
+    int typeName = findTypeInLinkedList(variableName, currentSymbolTable->hash[index]);
+
+    return typeName;
+}
+
+char *findStructTableNameByVariable(struct symboltable *currentSymbolTable, char *variableName)
+{
+    int index = calculateHashKey(variableName);
+    return findTypeNameInLinkedList(variableName, currentSymbolTable->hash[index]);
+}
+
+struct symboltable *findSymbolTable(char *tableName)
+{
+    int i = 0;
+    for (i = 0; i < functionSymbolTableLastIndex; i++)
     {
-        return "";
+        if (strcmp(functionSymbolTable[i]->tablename, tableName) == 0)
+        {
+            return functionSymbolTable[i];
+        }
     }
-    else
-    {
-        return typeName;
-    }
+    printf("Unable to find function symbol table '%s'\n", tableName);
+    exit(3);
 }
