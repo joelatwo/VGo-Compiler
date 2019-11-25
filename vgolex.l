@@ -255,7 +255,7 @@ float64 {createToken(FLOAT64); return FLOAT64;}
  * here we define a main function that will "drive" the lexer.
  */
 void createToken(int category){
-    struct Token *data = malloc(sizeof(struct Token));
+    struct Token *data = calloc(1, sizeof(struct Token));
     data->category = category;
 
     data->text = malloc(strlen(yytext) + 1);
@@ -337,7 +337,7 @@ void createToken(int category){
     
     }
 
-    struct Node *newNode = malloc(sizeof(struct Node));
+    struct Node *newNode = calloc(1, sizeof(struct Node));
     newNode->numberOfChildren = 0;
     newNode->children[0] = NULL;
     newNode->data = data;
@@ -386,14 +386,14 @@ void reportErrorOnlyText(char *errorMessage, char *text){
 }
 
 int createSemicolon(){
-    struct Token *data = malloc(sizeof(struct Token));
+    struct Token *data = calloc(1, sizeof(struct Token));
     data->category = SEMICOLON;
     data->text = ";";
     data->linenumber = yylineno;
     data->filename = malloc(strlen(currentfile) + 1);
     strcpy(data->filename, currentfile);
     
-    struct Node *newNode = malloc(sizeof(struct Node));
+    struct Node *newNode = calloc(1, sizeof(struct Node));
     newNode->data = data;
     newNode->category = SEMICOLON;
     newNode->categoryName = "terminal";

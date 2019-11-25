@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "linkedlist.h"
+#include "location.h"
 
 struct LinkedListNode *addToFront(struct Symbol *newData, struct LinkedListNode *head)
 {
@@ -100,7 +101,7 @@ void printData(struct Symbol *data)
         {
             printf(" const");
         }
-        else if (data->arraySize >= 0)
+        else if (data->arraySize > 0)
         {
             printf(" array with size %d", data->arraySize);
         }
@@ -227,4 +228,33 @@ char *findTypeNameInLinkedList(char *variableName, struct LinkedListNode *head)
     printf("Table with name %s is not found\n", variableName);
     exit(3);
     return "";
+}
+
+struct location *findLocationInLinkedList(char *variableName, struct LinkedListNode *head)
+{
+    struct LinkedListNode *current = head;
+    if (head == NULL)
+    {
+    }
+    else
+    {
+        if (strcmp(current->data->name, variableName) == 0)
+        {
+            return current->data->address;
+        }
+        // traverse to end
+        while (current->next != NULL)
+        {
+            if (strcmp(current->data->name, variableName) == 0)
+            {
+                // found it
+                return current->data->address;
+            }
+            else
+            {
+                current = current->next;
+            }
+        }
+    }
+    return NULL;
 }

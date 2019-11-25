@@ -19,6 +19,7 @@ extern YYSTYPE yylval;
 char *findTypeName(int typeId);
 int findTypeCategory(int typeId);
 int compareLeftAndRightTypes(int leftType, int righttype);
+int calculateBitSize(int type, int length);
 
 struct Node *treeHead;
 

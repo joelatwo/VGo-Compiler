@@ -15,9 +15,11 @@ struct Symbol
 {
     char *name;
     int type;
+    int bitSize;
     char *typeName;
     int isConst;
     int arraySize;
+    struct location *address;
 };
 
 struct LinkedListNode *addToFront(struct Symbol *newData, struct LinkedListNode *head);
@@ -30,5 +32,6 @@ int isVariableInLinkedList(char *variableName, struct LinkedListNode *head);
 int findTypeInLinkedList(char *variableName, struct LinkedListNode *head);
 int compareLinkedLists(struct LinkedListNode *typeList, struct LinkedListNode *paramList);
 char *findTypeNameInLinkedList(char *variableName, struct LinkedListNode *head);
+struct location *findLocationInLinkedList(char *variableName, struct LinkedListNode *head);
 
 #endif

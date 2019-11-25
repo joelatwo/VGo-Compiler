@@ -19,9 +19,15 @@ struct Node
     int numberOfChildren;
     struct Node *children[9];
     struct Token *data;
+    struct location *address;
+    struct location *first;
+    struct location *follow;
+    struct location *ifTrue;
+    struct location *ifFalse;
 };
 
 struct Node *createTree(int category, char *categoryName, int size, ...);
 int treeprint(struct Node *t, int depth);
+void treeprintlocations(struct Node *t, int depth);
 
 #endif

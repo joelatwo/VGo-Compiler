@@ -89,3 +89,39 @@ int compareLeftAndRightTypes(int leftType, int righttype)
         return 0;
     }
 }
+
+int calculateBitSize(int type, int length)
+{
+    int size = 0;
+
+    switch (type)
+    {
+    case INT:
+    case NUMERICLITERAL:
+    case OCTAL:
+    case HEXADECIMAL:
+        size = 8;
+        break;
+
+    case DECIMAL:
+    case SCIENTIFICNUM:
+        size = 8;
+        break;
+
+    case BOOL:
+        size = 8;
+        break;
+
+    case CHAR:
+    case STRINGLIT:
+        size = 8;
+        break;
+
+        if (length >= 0)
+        {
+            // if we have a size we need to multiply it
+            size *= length;
+        }
+    }
+    return size;
+}

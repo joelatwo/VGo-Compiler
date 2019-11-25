@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "linkedlist.h"
+#include "location.h"
 
 struct symboltable *globalSymbolTable;
 struct symboltable *currentSymbolTable;
@@ -45,9 +46,29 @@ int checkTypeSimpleStatement(struct Node *treeHead);
 int checkTypepexpr_no_paren(struct Node *treeHead);
 int checkTypeDefault(struct Node *treeHead);
 void checkForHeader(struct Node *treeHead);
+void addLabelsToFunctionSymbolTable(struct symboltable *currentFunctionSymbolTable);
+void addLabelsToFunctionLinkedList(struct LinkedListNode *head);
+void addLabelsToFunction(struct Node *treeHead);
+void addLabelsToLinkedList(struct LinkedListNode *head);
+void checkLabelChildren(struct Node *treeHead, int region, int *regionOffset);
+void generateLabels(struct Node *treeHead, int region, int *regionOffset);
+void handleIfLocation(struct Node *treeHead, int region, int *regionOffset);
+void handleForLocation(struct Node *treeHead, int region, int *regionOffset);
+struct operation *beginIntermediateCodeGeneration(struct Node *treeHead);
+struct operation *checkCodeGenerationChildren(struct Node *treeHead);
+struct operation *generateFunctionOperation(struct Node *treeHead);
+struct operation *generateExpressionOperation(struct Node *treeHead);
+struct operation *generateSimpleStmtOperation(struct Node *treeHead);
+struct operation *callFunction(struct Node *treeHead);
 
 struct LinkedListNode *checkParameterTypes(struct symboltable *functionSymbolTable, struct LinkedListNode *listHead, struct Node *treeHead);
 int arraySize = -1;
+
+int offsetGLOBAL = 0;
+int offsetLOCAL = 0;
+int offsetFUNCTION = 0;
+int offsetCONST = 0;
+int offsetSTRING = 0;
 
 void beginSemanticAnalysis(struct Node *treeHead)
 {
@@ -61,6 +82,12 @@ void beginSemanticAnalysis(struct Node *treeHead)
         printStructSymbolTable();
     }
     typeAnalysis(treeHead);
+
+    generateLabels(treeHead, REGIONGLOBAL, &offsetGLOBAL);
+
+    struct operation *programHead = beginIntermediateCodeGeneration(treeHead);
+    printf("Finished Execution\n");
+    printOperationLinkedList(programHead, currentfile);
 }
 
 void scopeAnalysis(struct Node *treeHead)
@@ -1006,3 +1033,474 @@ void checkForHeader(struct Node *treeHead)
         }
     }
 }
+
+void generateLabels(struct Node *treeHead, int region, int *regionOffset)
+{
+
+    if (treeHead != NULL)
+    {
+        switch (treeHead->category)
+        {
+        case xfndcl:
+            addLabelsToFunction(treeHead);
+            break;
+        case expr:
+            treeHead->address = createLocation(region, regionOffset);
+            checkLabelChildren(treeHead, region, regionOffset);
+            break;
+
+        case NUMERICLITERAL:
+        case OCTAL:
+        case HEXADECIMAL:
+            treeHead->address = createLocation(REGIONCONST, &offsetCONST);
+            break;
+
+        case DECIMAL:
+        case SCIENTIFICNUM:
+            treeHead->address = createLocation(REGIONCONST, &offsetCONST);
+            break;
+
+        case STRINGLIT:
+        case CHAR:
+            treeHead->address = createLocation(REGIONSTRING, &offsetSTRING);
+            break;
+
+        case LNAME:
+            treeHead->address = findLocationFromSymbolTable(currentSymbolTable, treeHead->data->text);
+            break;
+
+        case for_body:
+
+            handleForLocation(treeHead, region, regionOffset);
+            break;
+
+        case if_stmt:
+            handleIfLocation(treeHead, region, regionOffset);
+            break;
+
+        default:
+            checkLabelChildren(treeHead, region, regionOffset);
+            break;
+        }
+    }
+}
+
+void checkLabelChildren(struct Node *treeHead, int region, int *regionOffset)
+{
+    if (treeHead != NULL)
+    {
+        int i = 0;
+        for (i = 0; i < treeHead->numberOfChildren; i++)
+        {
+            generateLabels(treeHead->children[i], region, regionOffset);
+        }
+    }
+}
+
+void addLabelsToFunctionSymbolTable(struct symboltable *currentFunctionSymbolTable)
+{
+    int i = 0;
+    for (i = 0; i < 701; i++)
+    {
+        addLabelsToLinkedList(currentFunctionSymbolTable->hash[i]);
+    }
+}
+
+void addLabelsToLinkedList(struct LinkedListNode *head)
+{
+    struct LinkedListNode *current = head;
+    while (current != NULL)
+    {
+        current->data->address = createLocation(REGIONFUNCTION, &offsetFUNCTION);
+        current = current->next;
+    }
+}
+
+void addLabelsToFunction(struct Node *treeHead)
+{
+    treeHead->first = createLocation(REGIONFUNCTION, &offsetFUNCTION);
+    if (treeHead->numberOfChildren > 0)
+    {
+        if (treeHead->children[1]->category == fndcl && treeHead->children[1]->children[0]->numberOfChildren == 0)
+        {
+            struct symboltable *currentFunctionSymbolTable = findSymbolTable(treeHead->children[1]->children[0]->data->text);
+            currentFunctionSymbolTable->address = treeHead->first;
+            addLabelsToFunctionSymbolTable(currentFunctionSymbolTable);
+            if (currentFunctionSymbolTable->returnType != VOID)
+            {
+                currentFunctionSymbolTable->returnValue = createLocation(REGIONFUNCTION, &offsetFUNCTION);
+            }
+        }
+        if (treeHead->children[2]->category == fnbody)
+        {
+            checkLabelChildren(treeHead->children[2], REGIONFUNCTION, &offsetFUNCTION);
+
+            // after we get the end of the function
+            treeHead->follow = createLocation(REGIONFUNCTION, &offsetFUNCTION);
+        }
+    }
+}
+
+void handleIfLocation(struct Node *treeHead, int region, int *regionOffset)
+{
+    // setup each address location and then connect the nodes to the parent
+    if (treeHead->numberOfChildren >= 3 && treeHead->children[2]->category == loop_body)
+    {
+        treeHead->children[2]->address = createLocation(region, regionOffset);
+        treeHead->children[1]->ifTrue = treeHead->children[2]->address;
+        checkLabelChildren(treeHead->children[2], region, regionOffset);
+        treeHead->children[2]->follow = createLocation(region, regionOffset);
+    }
+    if (treeHead->numberOfChildren == 4 && treeHead->children[3]->category == nonterminal_else)
+    {
+        treeHead->children[3]->address = createLocation(region, regionOffset);
+        treeHead->children[1]->ifFalse = treeHead->children[3]->address;
+        checkLabelChildren(treeHead->children[3], region, regionOffset);
+    }
+    else if (treeHead->numberOfChildren >= 5 && treeHead->children[4]->category == nonterminal_else)
+    {
+        treeHead->children[4]->address = createLocation(region, regionOffset);
+        treeHead->children[1]->ifFalse = treeHead->children[4]->address;
+        checkLabelChildren(treeHead->children[4], region, regionOffset);
+    }
+}
+
+void handleForLocation(struct Node *treeHead, int region, int *regionOffset)
+{
+    treeprint(treeHead, 0);
+    if (treeHead->numberOfChildren == 2)
+    {
+        // handle header
+        // treeHead->children[0]
+        if (treeHead->children[0] != NULL)
+        {
+            // handle before loop
+            if (treeHead->children[0]->children[0] != NULL && treeHead->children[0]->children[0]->category == osimple_stmt)
+            {
+                treeHead->children[0]->children[0]->address = createLocation(region, regionOffset);
+                checkLabelChildren(treeHead->children[0]->children[0], region, regionOffset);
+            }
+            else if (treeHead->children[0]->children[1] != NULL && treeHead->children[0]->children[1]->category == osimple_stmt)
+            {
+                treeHead->children[0]->children[1]->address = createLocation(region, regionOffset);
+                checkLabelChildren(treeHead->children[0]->children[1], region, regionOffset);
+            }
+
+            // handle loop conditional
+            if (treeHead->children[0]->children[1] != NULL && treeHead->children[0]->children[1]->category != SEMICOLON)
+            {
+                treeHead->children[0]->children[1]->address = createLocation(region, regionOffset);
+                checkLabelChildren(treeHead->children[0]->children[1], region, regionOffset);
+            }
+            else if (treeHead->children[0]->children[2] != NULL && treeHead->children[0]->children[2]->category == osimple_stmt)
+            {
+                treeHead->children[0]->children[2]->address = createLocation(region, regionOffset);
+                checkLabelChildren(treeHead->children[0]->children[2], region, regionOffset);
+            }
+
+            // handle iteration
+            if (treeHead->children[0]->numberOfChildren == 5)
+            {
+                treeHead->children[0]->children[4]->address = createLocation(region, regionOffset);
+                checkLabelChildren(treeHead->children[0]->children[4], region, regionOffset);
+            }
+        }
+
+        // loop body
+        if (treeHead->children[1] != NULL)
+        {
+            // start of loop body
+            treeHead->children[1]->address = createLocation(region, regionOffset);
+            checkLabelChildren(treeHead->children[1], region, regionOffset);
+        }
+    }
+}
+
+struct operation *beginIntermediateCodeGeneration(struct Node *treeHead)
+{
+    struct operation *head = NULL;
+    if (treeHead != NULL)
+    {
+        switch (treeHead->category)
+        {
+
+        case xfndcl:
+            return generateFunctionOperation(treeHead);
+            break;
+
+        case pseudocall:
+            return callFunction(treeHead);
+
+        case expr:
+            return generateExpressionOperation(treeHead);
+            break;
+
+        case simple_stmt:
+            return generateSimpleStmtOperation(treeHead);
+            break;
+
+        default:
+            return checkCodeGenerationChildren(treeHead);
+            break;
+        }
+    }
+    return head;
+}
+
+struct operation *checkCodeGenerationChildren(struct Node *treeHead)
+{
+    struct operation *head = NULL;
+    int i = 0;
+    for (i = 0; i < treeHead->numberOfChildren; i++)
+    {
+        struct operation *right = beginIntermediateCodeGeneration(treeHead->children[i]);
+        head = combineLinkedList(head, right);
+    }
+    return head;
+}
+
+struct operation *generateFunctionOperation(struct Node *treeHead)
+{
+    struct operation *head = createOperation(D_LABEL, NULL, NULL, treeHead->first);
+    struct operation *right = checkCodeGenerationChildren(treeHead);
+    head = combineLinkedList(head, right);
+    head = combineLinkedList(head, createOperation(O_RET, NULL, NULL, treeHead->follow));
+    return head;
+}
+
+struct operation *generateExpressionOperation(struct Node *treeHead)
+{
+    struct operation *head = NULL;
+    if (treeHead != NULL)
+    {
+        int opcode = 0;
+
+        switch (treeHead->children[1]->category)
+        {
+        case PLUS:
+            opcode = O_ADD;
+            break;
+        case MINUS:
+            opcode = O_SUB;
+            break;
+        case STAR:
+            opcode = O_MUL;
+            break;
+        case DIVIDE:
+            opcode = O_DIV;
+            break;
+        case MOD:
+            // ~~~ generate mod
+            break;
+
+        case LEQ:
+            opcode = O_BEQ;
+            break;
+        case LNE:
+            opcode = O_NEG;
+            break;
+        case LLT:
+            opcode = O_BLT;
+            break;
+        case LGT:
+            opcode = O_BGT;
+            break;
+        case LLE:
+            opcode = O_BLE;
+            break;
+        case LGE:
+            opcode = O_BGE;
+            break;
+
+        default:
+            printf("error is not defined %d\n", treeHead->children[1]->category);
+            exit(4);
+            break;
+        }
+        struct location *leftAddress = NULL, *rightAddress = NULL;
+        if (treeHead->children[0]->address != NULL)
+        {
+            leftAddress = treeHead->children[0]->address;
+        }
+        else if (treeHead->children[0]->children[0]->address != NULL)
+        {
+            leftAddress = treeHead->children[0]->children[0]->address;
+        }
+        else
+        {
+            // ~~~ potential bug
+        }
+
+        if (treeHead->children[2]->address != NULL)
+        {
+            rightAddress = treeHead->children[2]->address;
+            // right = checkCodeGenerationChildren(treeHead->children[2]);
+        }
+        else if (treeHead->children[2]->children[0]->address != NULL)
+        {
+            rightAddress = treeHead->children[2]->children[0]->address;
+        }
+
+        head = createOperation(opcode, leftAddress, rightAddress, treeHead->address);
+        head = combineLinkedList(head, checkCodeGenerationChildren(treeHead));
+    }
+    return head;
+}
+
+struct operation *generateSimpleStmtOperation(struct Node *treeHead)
+{
+    struct operation *head = NULL;
+    int opcode = 0;
+    struct location *leftAddress = NULL, *rightAddress = NULL, *destination = treeHead->address;
+    if (treeHead != NULL)
+    {
+        if (treeHead->numberOfChildren == 3)
+        {
+            // general case
+            switch (treeHead->children[1]->category)
+            {
+            case EQUAL:
+                opcode = O_ASN;
+                if (treeHead->children[0]->address != NULL)
+                {
+                    destination = treeHead->children[0]->address;
+                }
+                else if (treeHead->children[0]->children[0]->address != NULL)
+                {
+                    destination = treeHead->children[0]->children[0]->address;
+                }
+                if (treeHead->children[2]->address != NULL)
+                {
+                    leftAddress = treeHead->children[2]->address;
+                }
+                else if (treeHead->children[2]->children[0]->address != NULL)
+                {
+                    leftAddress = treeHead->children[2]->children[0]->address;
+                }
+                break;
+            case LASOP:
+                opcode = O_ADD1;
+                if (treeHead->children[0]->address != NULL)
+                {
+                    destination = treeHead->children[0]->address;
+                }
+                else if (treeHead->children[0]->children[0]->address != NULL)
+                {
+                    destination = treeHead->children[0]->children[0]->address;
+                }
+                else
+                {
+                    // ~~~ bug
+                }
+                if (treeHead->children[0]->address != NULL)
+                {
+                    leftAddress = treeHead->children[0]->address;
+                }
+                else if (treeHead->children[0]->children[0]->address != NULL)
+                {
+                    leftAddress = treeHead->children[0]->children[0]->address;
+                }
+
+                if (treeHead->children[2] == NULL)
+                {
+                    // do nothing
+                }
+                else if (treeHead->children[2]->address != NULL)
+                {
+                    rightAddress = treeHead->children[2]->address;
+                }
+                else if (treeHead->children[2]->children[0]->address != NULL)
+                {
+                    rightAddress = treeHead->children[2]->children[0]->address;
+                }
+
+                break;
+
+            default:
+                printf("error is not defined %d\n", treeHead->children[1]->category);
+                exit(4);
+                break;
+            }
+        }
+        else if (treeHead->numberOfChildren == 2)
+        {
+            // we have a uniary operation like ++
+            switch (treeHead->children[1]->category)
+            {
+            case LINC:
+                opcode = O_ADD1;
+                break;
+            case LDEC:
+                opcode = O_SUB1;
+                break;
+
+            default:
+                printf("error is not defined %d\n", treeHead->children[1]->category);
+                exit(4);
+                break;
+            }
+            if (treeHead->children[0]->address != NULL)
+            {
+                leftAddress = treeHead->children[0]->address;
+            }
+            else if (treeHead->children[0]->children[0]->address != NULL)
+            {
+                leftAddress = treeHead->children[0]->children[0]->address;
+            }
+        }
+        head = createOperation(opcode, leftAddress, rightAddress, destination);
+        head = combineLinkedList(head, checkCodeGenerationChildren(treeHead));
+    }
+    return head;
+}
+
+struct operation *callFunction(struct Node *treeHead)
+{
+    struct operation *head = NULL;
+    char *functionName = "";
+    struct location *address = NULL;
+    struct symboltable *functionTable = NULL;
+    if (treeHead->children[0]->children[0]->category == LNAME)
+    {
+        functionName = treeHead->children[0]->children[0]->data->text;
+        functionTable = findFunctionLocation(functionName);
+        address = functionTable->address;
+    }
+    else
+    {
+        printf("we haven't figured out built in functions yet\n");
+        // ~~~ handle packages
+    }
+    head = createOperation(O_GOTO, NULL, NULL, address);
+
+    if (functionTable->declarationPropertyList != NULL)
+    {
+        // ~~~ finish param list
+        // struct operation *paramAssignment = NULL;
+        // struct LinkedListNode *current = functionTable->declarationPropertyList;
+        // struct location *paramValue = NULL;
+        // int paramNumber = 0;
+        // while (current != NULL)
+        // {
+        //     // paramValue = getNextParamValue(treeHead->children[4], paramNumber);
+        //     // paramAssignment(O_ASN, )
+        //     current = current->next;
+        // }
+    }
+
+    head = combineLinkedList(head, checkCodeGenerationChildren(treeHead));
+
+    return head;
+}
+
+// struct location *getNextParamValue(struct Node *treeHead, int paramNumber){
+//     if(treeHead != NULL){
+//         if(treeHead->address != NULL ){
+//             return treeHead->address;
+//         }else{
+//             return getNextParamValue(treeHead->)
+//         }
+//     }else{
+//         return NULL;
+//     }
+// }

@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-c -g -Wall
-OBJ=vgomain.o lex.yy.o vgobison.tab.o tree.o globalutilities.o semantic.o symboltable.o linkedlist.o
+OBJ=vgomain.o lex.yy.o vgobison.tab.o tree.o globalutilities.o semantic.o symboltable.o linkedlist.o location.o
 
 vgo: $(OBJ)
 	$(CC) -o vgo $(OBJ)
@@ -26,7 +26,7 @@ tree.o:	tree.c tree.h nonterminal.h
 globalutilities.o: globalutilities.c globalutilities.h tree.h
 	$(CC) $(CFLAGS) globalutilities.c
 
-semantic.o: semantic.c semantic.h nonterminal.h symboltable.h
+semantic.o: semantic.c semantic.h nonterminal.h symboltable.h location.h
 	$(CC) $(CFLAGS) semantic.c
 
 symboltable.o: symboltable.c symboltable.h tree.h linkedlist.h
@@ -34,6 +34,9 @@ symboltable.o: symboltable.c symboltable.h tree.h linkedlist.h
 
 linkedlist.o: linkedlist.c linkedlist.h
 	$(CC) $(CFLAGS) linkedlist.c
+
+location.o: location.c location.h
+	$(CC) $(CFLAGS) location.c
 	
 
 clean:

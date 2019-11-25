@@ -12,6 +12,9 @@ struct symboltable
     struct LinkedListNode *declarationPropertyList;
     int returnType;
     char *returnTypeName;
+    int regionCounter;
+    struct location *address;
+    struct location *returnValue;
 };
 
 struct symboltable *createSymbolTable(char *tableName, struct symboltable *parent);
@@ -28,5 +31,7 @@ void printSymbolTable(struct symboltable *currentSymbolTable);
 struct symboltable *findStructTable(char *variableName);
 int findTypeInSymbolTable(struct symboltable *currentSymbolTable, char *variableName);
 struct symboltable *findSymbolTable(char *tableName);
+struct location *findLocationFromSymbolTable(struct symboltable *currentSymbolTable, char *variableName);
+struct symboltable *findFunctionLocation(char *variableName);
 
 #endif

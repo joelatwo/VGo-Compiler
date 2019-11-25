@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "nonterminal.h"
+#include "globalutilities.h"
 
 struct symboltable *functionSymbolTable[100];
 int functionSymbolTableLastIndex = 0;
@@ -16,6 +17,7 @@ struct symboltable *createSymbolTable(char *tableName, struct symboltable *paren
     struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
+    newSymbolTable->regionCounter = 0;
     return newSymbolTable;
 }
 
@@ -44,6 +46,7 @@ void insertVariableIntoHash(struct Node *terminal, int type, char *typeName, str
         struct Symbol *newData = malloc(sizeof(struct Symbol));
         newData->name = strdup(terminal->data->text);
         newData->type = type;
+        newData->arraySize = 0;
         newData->typeName = strdup(typeName);
         // previously we set the category as a storage place for the isConst flag to keep track
         if (terminal->category == lconst)
@@ -54,6 +57,17 @@ void insertVariableIntoHash(struct Node *terminal, int type, char *typeName, str
         else if (terminal->data->ival >= 0)
         {
             newData->arraySize = terminal->data->ival;
+        }
+
+        if (type == LNAME)
+        {
+            printf("%s\n", newData->typeName);
+            // newData->bitSize = handleStructBitSize(newData->typeName);
+        }
+        else
+        {
+
+            newData->bitSize = calculateBitSize(type, newData->arraySize);
         }
 
         currentSymbolTable->hash[index] = addToFront(newData, currentSymbolTable->hash[index]);
@@ -122,6 +136,7 @@ struct symboltable *createStructTable(char *tableName, struct symboltable *paren
     struct symboltable *newSymbolTable = calloc(1, sizeof(struct symboltable));
     newSymbolTable->tablename = strdup(tableName);
     newSymbolTable->parent = parent;
+    newSymbolTable->regionCounter = 0;
 
     structSymbolTable[structSymbolTableLastIndex] = newSymbolTable;
     structSymbolTableLastIndex++;
@@ -222,4 +237,23 @@ struct symboltable *findSymbolTable(char *tableName)
     }
     printf("Unable to find function symbol table '%s'\n", tableName);
     exit(3);
+}
+
+struct location *findLocationFromSymbolTable(struct symboltable *currentSymbolTable, char *variableName)
+{
+    int index = calculateHashKey(variableName);
+    return findLocationInLinkedList(variableName, currentSymbolTable->hash[index]);
+}
+
+struct symboltable *findFunctionLocation(char *variableName)
+{
+    int i = 0;
+    for (; i < functionSymbolTableLastIndex; i++)
+    {
+        if (strcmp(functionSymbolTable[i]->tablename, variableName) == 0)
+        {
+            return functionSymbolTable[i];
+        }
+    }
+    return NULL;
 }
